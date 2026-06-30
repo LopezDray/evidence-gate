@@ -1,0 +1,49 @@
+{
+  "name": "evidence-gate",
+  "version": "0.1.0",
+  "description": "Stop your AI from making up facts about your own data. A pre-generation gate that decides whether an LLM may summarize, based on evidence coverage, freshness, and quality.",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./presets": "./src/presets.js"
+  },
+  "bin": {
+    "evidence-gate-mcp": "mcp/server.mjs"
+  },
+  "files": [
+    "src",
+    "mcp",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node test/core.test.mjs && node test/edge.test.mjs"
+  },
+  "keywords": [
+    "llm",
+    "rag",
+    "ai",
+    "agents",
+    "guardrails",
+    "hallucination",
+    "grounding",
+    "reliability",
+    "mcp",
+    "evals"
+  ],
+  "license": "MIT",
+  "author": "LopezDray",
+  "repository": { "type": "git", "url": "git+https://github.com/LopezDray/evidence-gate.git" },
+  "homepage": "https://lopezdray.github.io/evidence-gate/",
+  "bugs": { "url": "https://github.com/LopezDray/evidence-gate/issues" },
+  "dependencies": {},
+  "peerDependencies": {
+    "@modelcontextprotocol/sdk": ">=1.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@modelcontextprotocol/sdk": {
+      "optional": true
+    }
+  }
+}

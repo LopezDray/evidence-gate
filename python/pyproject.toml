@@ -1,0 +1,19 @@
+[project]
+name = "evidence-gate"
+version = "0.1.0"
+description = "Stop your AI from making up facts about your own data."
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "MIT" }
+keywords = ["llm", "rag", "ai", "agents", "guardrails", "hallucination", "grounding", "reliability"]
+authors = [{ name = "LopezDray" }]
+
+[project.urls]
+Homepage = "https://github.com/LopezDray/evidence-gate"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["evidence_gate"]

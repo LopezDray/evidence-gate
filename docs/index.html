@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Evidence Gate — stop your AI from making up facts about your own data</title>
+<meta name="description" content="A pre-generation gate that decides whether an LLM may speak, based on evidence coverage, freshness, and quality. Zero-dependency, MIT.">
+<style>
+  :root{
+    --bg:#0b0e14; --panel:#11161f; --panel2:#0e131b; --line:#1f2733;
+    --ink:#e6edf3; --muted:#8b97a7; --accent:#5eead4; --accent2:#7dd3fc;
+    --ok:#34d399; --warn:#fbbf24; --bad:#f87171; --fall:#a78bfa;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.6}
+  a{color:var(--accent2);text-decoration:none}
+  a:hover{text-decoration:underline}
+  .wrap{max-width:920px;margin:0 auto;padding:0 20px}
+  code,pre{font-family:var(--mono)}
+  .pill{display:inline-block;font-size:12px;color:var(--accent);border:1px solid var(--line);border-radius:999px;padding:3px 11px;background:var(--panel)}
+
+  header{padding:64px 0 28px;text-align:center}
+  h1{font-size:40px;line-height:1.15;margin:18px 0 10px;letter-spacing:-.5px}
+  h1 .grad{background:linear-gradient(90deg,var(--accent),var(--accent2));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .sub{color:var(--muted);font-size:18px;max-width:620px;margin:0 auto}
+  .cta{margin-top:26px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+  .btn{font-family:var(--mono);font-size:14px;padding:10px 16px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer}
+  .btn.primary{background:var(--accent);color:#04201b;border-color:var(--accent);font-weight:600}
+
+  section{padding:30px 0;border-top:1px solid var(--line)}
+  h2{font-size:22px;margin:0 0 14px}
+  .muted{color:var(--muted)}
+
+  pre.code{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:16px;overflow:auto;font-size:13.5px}
+  .tok-k{color:var(--accent2)} .tok-s{color:var(--accent)} .tok-c{color:var(--muted)}
+
+  /* demo */
+  .demo{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:760px){.demo{grid-template-columns:1fr}.wrap{padding:0 16px}h1{font-size:30px}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
+  .card h3{margin:0 0 10px;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+  textarea{width:100%;height:190px;background:var(--panel2);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:10px;font-family:var(--mono);font-size:13px;resize:vertical}
+  .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:10px 0}
+  select{background:var(--panel2);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:8px;font-family:var(--mono);font-size:13px}
+  .chip{font-family:var(--mono);font-size:12px;padding:6px 10px;border-radius:7px;border:1px solid var(--line);background:var(--panel2);color:var(--ink);cursor:pointer}
+  .chip:hover{border-color:var(--accent)}
+
+  .status{display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-weight:600;font-size:15px;padding:6px 12px;border-radius:8px;border:1px solid var(--line)}
+  .s-available{color:var(--ok)} .s-quality_warning{color:var(--warn)} .s-fallback{color:var(--fall)} .s-missing{color:var(--bad)}
+  .dot{width:9px;height:9px;border-radius:50%;background:currentColor}
+  .kv{font-family:var(--mono);font-size:13px;margin:10px 0}
+  .kv b{color:var(--muted);font-weight:500}
+  .yes{color:var(--ok)} .no{color:var(--bad)}
+  .caveat{font-family:var(--mono);font-size:12.5px;background:var(--panel2);border-left:3px solid var(--warn);border-radius:5px;padding:8px 10px;margin:7px 0;color:var(--ink)}
+  .caveat.block{border-left-color:var(--bad)}
+  footer{padding:40px 0 60px;text-align:center;color:var(--muted);font-size:14px}
+  .err{color:var(--bad);font-family:var(--mono);font-size:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <span class="pill">zero-dependency · MIT · npm · PyPI · MCP</span>
+    <h1>Stop your AI from <span class="grad">making up facts</span><br>about your own data</h1>
+    <p class="sub">A pre-generation gate that decides whether an LLM may speak — based on evidence coverage, freshness, and quality. The missing step between <em>retrieve</em> and <em>generate</em>.</p>
+    <div class="cta">
+      <a class="btn primary" href="#demo">Try the live demo ↓</a>
+      <a class="btn" href="https://github.com/LopezDray/evidence-gate">View on GitHub</a>
+    </div>
+  </header>
+
+  <section>
+    <h2>The problem</h2>
+    <p class="muted">LLMs answer confidently even when the data is missing, stale, or partial — inventing a quarter that doesn't exist, or quoting a cached source as authoritative. Content-safety guardrails (toxicity, PII) don't catch this. It's a <strong style="color:var(--ink)">grounding</strong> problem, and it needs a grounding gate.</p>
+  </section>
+
+  <section>
+    <h2>How it looks in code</h2>
+    <pre class="code"><span class="tok-c">// before you call the model:</span>
+<span class="tok-k">const</span> gate = <span class="tok-k">evidenceGate</span>({ records: myRecords, rules: presets.<span class="tok-s">FINANCE</span> });
+
+<span class="tok-k">if</span> (!gate.allowedActions.summarize) {
+  <span class="tok-k">return</span> gate.caveats.join(<span class="tok-s">" "</span>);  <span class="tok-c">// "No financial statements available — the AI must not invent numbers."</span>
+}
+<span class="tok-c">// otherwise inject gate.caveats into your prompt and generate</span></pre>
+  </section>
+
+  <section id="demo">
+    <h2>Live demo</h2>
+    <p class="muted">Edit the records, pick a domain preset, and watch the gate decide. Runs entirely in your browser.</p>
+    <div class="row">
+      <span class="muted" style="font-size:13px">Examples:</span>
+      <button class="chip" data-ex="missing">missing data</button>
+      <button class="chip" data-ex="good">good data</button>
+      <button class="chip" data-ex="stale">stale data</button>
+      <button class="chip" data-ex="fallback">cached / fallback</button>
+    </div>
+    <div class="demo">
+      <div class="card">
+        <h3>Input</h3>
+        <div class="row">
+          <span class="muted" style="font-size:13px">Preset:</span>
+          <select id="preset">
+            <option value="FINANCE">FINANCE</option>
+            <option value="HEALTH">HEALTH</option>
+            <option value="SUPPORT">SUPPORT</option>
+          </select>
+          <span class="muted" style="font-size:12px">records (JSON)</span>
+        </div>
+        <textarea id="records" spellcheck="false"></textarea>
+        <div id="err" class="err"></div>
+      </div>
+      <div class="card">
+        <h3>Gate output</h3>
+        <div id="out"></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>A domain is just a preset</h2>
+    <p class="muted">The engine is domain-agnostic. Finance, healthcare, support, legal — adding a vertical means adding a preset, never touching the core. Forbidden actions (<code>diagnose</code>, <code>personalized_advice</code>, <code>claim_realtime</code>) are always forced to <code>false</code>.</p>
+    <pre class="code"><span class="tok-k">const</span> HEALTH = {
+  primaryLabel: <span class="tok-s">"lab results"</span>, staleDays: <span class="tok-s">90</span>, minRecords: <span class="tok-s">2</span>,
+  qualityThreshold: <span class="tok-s">80</span>, forbiddenActions: [<span class="tok-s">"diagnose"</span>, <span class="tok-s">"prescribe"</span>]
+};</pre>
+  </section>
+
+  <section>
+    <h2>Install</h2>
+    <pre class="code">npm install evidence-gate
+pip install evidence-gate</pre>
+    <p class="muted">There's also an MCP server (<code>npx evidence-gate-mcp</code>) so an agent can call <code>check_evidence</code> on itself before it answers.</p>
+  </section>
+
+  <footer>
+    Running in production in a finance application. &nbsp;·&nbsp; MIT &nbsp;·&nbsp; <a href="https://github.com/LopezDray/evidence-gate">GitHub</a>
+  </footer>
+
+</div>
+
+<script>
+// ── inlined core (identical logic to the published package) ──────────────────
+function parseDate(v){if(!v)return null;const m=String(v).slice(0,10).match(/^(\d{4})-(\d{2})-(\d{2})$/);if(!m)return null;const y=+m[1],mo=+m[2],d=+m[3];const dt=new Date(Date.UTC(y,mo-1,d));if(dt.getUTCFullYear()!==y||dt.getUTCMonth()!==mo-1||dt.getUTCDate()!==d)return null;return dt;}
+function daysSince(d){if(!d)return null;const n=new Date();const t=Date.UTC(n.getUTCFullYear(),n.getUTCMonth(),n.getUTCDate());return Math.floor((t-d.getTime())/86400000);}
+function freshnessLabel(l,thr){const a=daysSince(l);if(a===null)return"unknown";return a>thr?"stale":"fresh";}
+function classifyStatus(records,rules){
+  const u=records||[];
+  if(!u.length)return{status:"missing",freshness:"unknown",latest:null,count:0,qualityMin:null,flags:[]};
+  const ds=u.map(r=>parseDate(r.date)).filter(Boolean);
+  const latest=ds.length?new Date(Math.max(...ds.map(d=>d.getTime()))):null;
+  const freshness=latest?freshnessLabel(latest,rules.staleDays):"unknown";
+  const ls=latest?latest.toISOString().slice(0,10):null;
+  if(u.every(r=>r.tier==="fallback"))return{status:"fallback",freshness,latest:ls,count:u.length,qualityMin:null,flags:[]};
+  const sc=u.map(r=>r.qualityScore).filter(v=>v!==null&&v!==undefined);
+  const qm=sc.length?Math.min(...sc):null;
+  let fl=[];for(const r of u){const w=r.flags;if(Array.isArray(w))fl.push(...w);else if(typeof w==="string"&&w)fl.push(w);}
+  fl=[...new Set(fl)].sort();
+  const rev=u.some(r=>r.quality==="review");
+  const issue=(qm!==null&&qm<rules.qualityThreshold)||fl.length>0||rev;
+  let st;if(u.length<rules.minRecords)st="quality_warning";else if(issue)st="quality_warning";else st="available";
+  return{status:st,freshness,latest:ls,count:u.length,qualityMin:qm,flags:fl};
+}
+function deriveAllowedActions({primaryStatus,supportingPresent=false,forbiddenActions=[]}={}){
+  const summarize=["available","quality_warning","fallback"].includes(primaryStatus)||supportingPresent;
+  const compare=["available","quality_warning"].includes(primaryStatus);
+  const a={summarize,compare};for(const x of forbiddenActions)a[x]=false;return a;
+}
+function evidenceGate({records=[],supporting=[],rules}={}){
+  const p=classifyStatus(records,rules);
+  const sp=(supporting||[]).length>0;
+  const allowedActions=deriveAllowedActions({primaryStatus:p.status,supportingPresent:sp,forbiddenActions:rules.forbiddenActions});
+  const w=[];const M=rules.messages||{};const L=rules.primaryLabel||"primary data";
+  if(p.status==="missing")w.push({level:"block",code:"primary_missing",message:M.primary_missing||`No ${L} available — the AI must not invent numbers.`});
+  else if(p.status==="fallback")w.push({level:"review",code:"primary_fallback",message:M.primary_fallback||`${L} is cached/fallback, not authoritative — the AI must say so.`});
+  else if(p.status==="quality_warning")w.push({level:"review",code:"primary_quality",message:M.primary_quality||`${L} has a data-quality warning — the AI must add a caveat.`});
+  if(p.freshness==="stale")w.push({level:"review",code:"primary_stale",message:M.primary_stale||`${L} is stale (older than ${rules.staleDays} days) — the AI must not say "latest" or "today".`});
+  if(!sp)w.push({level:"info",code:"no_supporting",message:M.no_supporting||"No supporting evidence — primary source only."});
+  return{status:p.status,freshness:p.freshness,allowedActions,warnings:w,caveats:w.map(x=>x.message)};
+}
+const PRESETS={
+  FINANCE:{primaryLabel:"financial statements",staleDays:135,minRecords:4,qualityThreshold:70,forbiddenActions:["personalized_advice","claim_realtime"]},
+  HEALTH:{primaryLabel:"lab results",staleDays:90,minRecords:2,qualityThreshold:80,forbiddenActions:["diagnose","prescribe","claim_realtime"]},
+  SUPPORT:{primaryLabel:"knowledge-base documents",staleDays:365,minRecords:1,qualityThreshold:50,forbiddenActions:["make_promises","claim_realtime"]},
+};
+
+// ── demo wiring ──────────────────────────────────────────────────────────────
+function isoAgo(d){const x=new Date();x.setUTCDate(x.getUTCDate()-d);return x.toISOString().slice(0,10);}
+const EX={
+  missing: [],
+  good: [{date:isoAgo(20),qualityScore:92},{date:isoAgo(110),qualityScore:90},{date:isoAgo(200),qualityScore:91},{date:isoAgo(290),qualityScore:93}],
+  stale: [{date:isoAgo(300),qualityScore:90},{date:isoAgo(390),qualityScore:90},{date:isoAgo(480),qualityScore:90},{date:isoAgo(570),qualityScore:90}],
+  fallback: [{date:isoAgo(20),qualityScore:88,tier:"fallback"},{date:isoAgo(110),qualityScore:88,tier:"fallback"}],
+};
+const $=s=>document.querySelector(s);
+const ta=$("#records"),sel=$("#preset"),out=$("#out"),err=$("#err");
+
+function render(){
+  err.textContent="";
+  let recs;
+  try{recs=JSON.parse(ta.value||"[]");if(!Array.isArray(recs))throw 0;}
+  catch(e){err.textContent="⚠ records must be a JSON array";out.innerHTML="";return;}
+  const g=evidenceGate({records:recs,rules:PRESETS[sel.value]});
+  const aa=g.allowedActions;
+  const actLine=Object.entries(aa).map(([k,v])=>`<span class="${v?'yes':'no'}">${v?'✓':'✕'} ${k}</span>`).join(" &nbsp; ");
+  out.innerHTML=`
+    <div class="status s-${g.status}"><span class="dot"></span>${g.status}</div>
+    <div class="kv"><b>freshness:</b> ${g.freshness} &nbsp; <b>records:</b> ${recs.length}</div>
+    <div class="kv"><b>allowedActions:</b><br>${actLine}</div>
+    <div class="kv"><b>caveats (inject into prompt):</b></div>
+    ${g.caveats.map((c,i)=>`<div class="caveat ${g.warnings[i].level==='block'?'block':''}">${c}</div>`).join("")}
+  `;
+}
+document.querySelectorAll(".chip").forEach(b=>b.onclick=()=>{ta.value=JSON.stringify(EX[b.dataset.ex],null,2);render();});
+ta.addEventListener("input",render);
+sel.addEventListener("change",render);
+ta.value=JSON.stringify(EX.good,null,2);
+render();
+</script>
+</body>
+</html>
