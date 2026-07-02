@@ -7,7 +7,39 @@ No dependencies. Domain-agnostic: bring records + a ruleset (preset).
 
     record = {"date", "quality_score"?, "quality"?, "flags"?, "tier"?}
 """
-from datetime import datetime, date
+import json
+from datetime import datetime, date, timezone
+
+# ── Decision log primitives ──────────────────────────────────────────────────
+# A decision record is the audit trail of one gate call: WHAT the gate decided,
+# under WHICH rules, over WHICH evidence — without storing the evidence itself
+# (records may be sensitive; only a digest of them is kept).
+#
+# Digests are FNV-1a 64-bit over canonical JSON. Deterministic and identical
+# across the JS and Python ports; NOT cryptographic — they detect drift and
+# correlate log entries, they don't prove integrity against an adversary.
+# Cross-port equality is guaranteed for JSON-safe values (strings, booleans,
+# null, integers, and floats with a plain decimal form); exotic floats
+# (e.g. 1e-7) and NaN serialize differently per language — keep them out of
+# records you intend to digest.
+
+DECISION_SCHEMA = "evidence-gate.decision/1"
+
+
+def canonical_json(value):
+    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+
+
+def fnv1a64(s):
+    h = 0xCBF29CE484222325
+    for b in s.encode("utf-8"):
+        h ^= b
+        h = (h * 0x100000001B3) & 0xFFFFFFFFFFFFFFFF
+    return format(h, "016x")
+
+
+def evidence_digest(value):
+    return "fnv1a64:" + fnv1a64(canonical_json(value))
 
 
 def parse_date(value):
@@ -90,8 +122,13 @@ def derive_allowed_actions(primary_status, supporting_present=False, forbidden_a
     return actions
 
 
-def evidence_gate(records=None, supporting=None, rules=None):
-    """records + rules -> {status, freshness, allowed_actions, warnings, caveats}."""
+def evidence_gate(records=None, supporting=None, rules=None, decision=None):
+    """records + rules -> {status, freshness, allowed_actions, warnings, caveats, decision?}.
+
+    ``decision`` (opt-in): pass ``True`` or ``{"id": ..., "at": ...}`` to also
+    get a JSONL-serializable decision record for your audit log. The core never
+    writes anywhere — persisting the record is the caller's job.
+    """
     if not rules:
         raise ValueError("evidence_gate: `rules` (a preset) is required")
 
@@ -119,5 +156,36 @@ def evidence_gate(records=None, supporting=None, rules=None):
         warnings.append({"level": "info", "code": "no_supporting",
                          "message": m.get("no_supporting", "No supporting evidence — primary source only.")})
 
-    return {"status": st, "freshness": primary["freshness"], "allowed_actions": allowed,
-            "warnings": warnings, "caveats": [w["message"] for w in warnings]}
+    result = {"status": st, "freshness": primary["freshness"], "allowed_actions": allowed,
+              "warnings": warnings, "caveats": [w["message"] for w in warnings]}
+
+    if decision:
+        meta = {} if decision is True else decision
+        # default timestamp matches the JS port's toISOString() shape: milliseconds + "Z"
+        at = meta.get("at")
+        if at is None:
+            at = datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+        result["decision"] = {
+            "schema": DECISION_SCHEMA,
+            "id": meta.get("id"),
+            "at": at,
+            "digests": {"evidence": evidence_digest({"records": records or [], "supporting": supporting or []}),
+                        "rules": evidence_digest(rules)},
+            "counts": {"records": len(records or []), "supporting": len(supporting or [])},
+            "rules": {
+                "primary_label": label,
+                "stale_days": rules.get("stale_days"),
+                "min_records": rules.get("min_records"),
+                "quality_threshold": rules.get("quality_threshold"),
+                "forbidden_actions": rules.get("forbidden_actions") or [],
+            },
+            "outcome": {
+                "status": st,
+                "freshness": primary["freshness"],
+                "allowed_actions": allowed,
+                "warnings": [{"level": w["level"], "code": w["code"]} for w in warnings],
+                "caveats": result["caveats"],
+            },
+        }
+
+    return result

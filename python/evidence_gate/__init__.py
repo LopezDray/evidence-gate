@@ -6,6 +6,10 @@ from .core import (
     parse_date,
     days_since,
     freshness_label,
+    canonical_json,
+    fnv1a64,
+    evidence_digest,
+    DECISION_SCHEMA,
 )
 from . import presets
 
@@ -16,6 +20,10 @@ __all__ = [
     "parse_date",
     "days_since",
     "freshness_label",
+    "canonical_json",
+    "fnv1a64",
+    "evidence_digest",
+    "DECISION_SCHEMA",
     "presets",
 ]
 __version__ = "0.1.0"

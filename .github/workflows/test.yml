@@ -13,10 +13,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
-      - name: Core tests
-        run: node test/core.test.mjs
-      - name: Edge-case tests
-        run: node test/edge.test.mjs
+      - name: JS tests (core + edge + decision)
+        run: npm test
 
   python:
     runs-on: ubuntu-latest
