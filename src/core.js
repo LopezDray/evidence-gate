@@ -95,6 +95,10 @@ export function deriveAllowedActions({ primaryStatus, supportingPresent = false,
 // Digests are FNV-1a 64-bit over canonical JSON. Deterministic and identical
 // across the JS and Python ports; NOT cryptographic — they detect drift and
 // correlate log entries, they don't prove integrity against an adversary.
+// Cross-port equality is guaranteed for JSON-safe values (strings, booleans,
+// null, integers, and floats with a plain decimal form); exotic floats
+// (e.g. 1e-7) and NaN serialize differently per language — keep them out of
+// records you intend to digest.
 
 export const DECISION_SCHEMA = "evidence-gate.decision/1";
 
@@ -128,9 +132,11 @@ export function evidenceDigest(value) {
 //   writes anywhere — persisting the record is the caller's job.
 export function evidenceGate({ records = [], supporting = [], rules, decision } = {}) {
   if (!rules) throw new Error("evidenceGate: `rules` (a preset) is required");
+  records = records || []; // null must behave like [] everywhere, incl. digests (Python port: `records or []`)
+  supporting = supporting || [];
 
   const primary = classifyStatus(records, rules);
-  const supportingPresent = (supporting || []).length > 0;
+  const supportingPresent = supporting.length > 0;
   const allowedActions = deriveAllowedActions({
     primaryStatus: primary.status,
     supportingPresent,
@@ -160,7 +166,7 @@ export function evidenceGate({ records = [], supporting = [], rules, decision } 
       id: meta.id ?? null,
       at: meta.at ?? new Date().toISOString(),
       digests: { evidence: evidenceDigest({ records, supporting }), rules: evidenceDigest(rules) },
-      counts: { records: records.length, supporting: (supporting || []).length },
+      counts: { records: records.length, supporting: supporting.length },
       rules: {
         primaryLabel: label,
         staleDays: rules.staleDays ?? null,

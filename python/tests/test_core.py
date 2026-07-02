@@ -90,6 +90,14 @@ def test_decision_record():
     g3 = evidence_gate(records=records[:3], rules=FINANCE, decision=True)
     assert g3["decision"]["digests"]["evidence"] != d["digests"]["evidence"]
     assert g2["decision"]["id"] is None and isinstance(g2["decision"]["at"], str)
+    # default timestamp matches the JS port's toISOString() shape
+    assert g2["decision"]["at"].endswith("Z") and "+00:00" not in g2["decision"]["at"]
+
+    # None records must behave like [] — digest identical to the JS port's
+    # for the same (empty) evidence set
+    g_none = evidence_gate(records=None, rules=FINANCE, decision=True)
+    assert g_none["decision"]["digests"]["evidence"] == "fnv1a64:b154377d61167670"
+    assert g_none["decision"]["counts"]["records"] == 0
 
 
 if __name__ == "__main__":

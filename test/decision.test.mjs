@@ -66,5 +66,14 @@ ok("rules digest is stable", g2.decision.digests.rules === d.digests.rules);
 // decision: true generates a timestamp
 ok("decision:true fills at + null id", typeof g2.decision.at === "string" && g2.decision.id === null);
 
+// null records must behave like [] — no crash, and digest identical to the
+// Python port's for the same (empty) evidence set
+const gNull = evidenceGate({ records: null, rules: FINANCE, decision: true });
+ok("records:null + decision does not throw", gNull.decision !== undefined);
+ok("records:null digests as empty set (cross-port constant)",
+  gNull.decision.digests.evidence === "fnv1a64:b154377d61167670",
+  gNull.decision.digests.evidence);
+ok("records:null counts as zero", gNull.decision.counts.records === 0);
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail === 0 ? 0 : 1);

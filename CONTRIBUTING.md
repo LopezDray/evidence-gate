@@ -13,8 +13,8 @@ Thanks for considering a contribution! Evidence Gate is intentionally small and 
 ```bash
 git clone <this repo>
 cd evidence-gate
-node test/core.test.mjs && node test/edge.test.mjs   # JS
-python python/tests/test_core.py                      # Python
+npm test                          # JS (core + edge + decision suites)
+python python/tests/test_core.py  # Python
 ```
 
 The JS (`src/`) and Python (`python/`) ports implement the same logic. If you change a rule, change both and update both test suites.

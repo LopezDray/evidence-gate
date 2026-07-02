@@ -18,6 +18,10 @@ from datetime import datetime, date, timezone
 # Digests are FNV-1a 64-bit over canonical JSON. Deterministic and identical
 # across the JS and Python ports; NOT cryptographic — they detect drift and
 # correlate log entries, they don't prove integrity against an adversary.
+# Cross-port equality is guaranteed for JSON-safe values (strings, booleans,
+# null, integers, and floats with a plain decimal form); exotic floats
+# (e.g. 1e-7) and NaN serialize differently per language — keep them out of
+# records you intend to digest.
 
 DECISION_SCHEMA = "evidence-gate.decision/1"
 
@@ -157,10 +161,14 @@ def evidence_gate(records=None, supporting=None, rules=None, decision=None):
 
     if decision:
         meta = {} if decision is True else decision
+        # default timestamp matches the JS port's toISOString() shape: milliseconds + "Z"
+        at = meta.get("at")
+        if at is None:
+            at = datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
         result["decision"] = {
             "schema": DECISION_SCHEMA,
             "id": meta.get("id"),
-            "at": meta.get("at") or datetime.now(timezone.utc).isoformat(),
+            "at": at,
             "digests": {"evidence": evidence_digest({"records": records or [], "supporting": supporting or []}),
                         "rules": evidence_digest(rules)},
             "counts": {"records": len(records or []), "supporting": len(supporting or [])},
