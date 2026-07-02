@@ -22,7 +22,7 @@
 
 | ID | งาน | Priority | Effort |
 |---|---|---|---|
-| WP1 | ปิด open questions ทั้งหมดของสอง design docs + spec gaps จากรีวิว (supporting ใน verifyClaims, provenance digest placeholder, กติกา attribution เดียว, ห้าม id ตัวเลขล้วน, 0-based index) | P0 ก่อนเริ่ม P3-1/P3-2 | 1–2 review-hrs |
+| WP1 | ~~ปิด open questions ทั้งหมดของสอง design docs + spec gaps จากรีวิว~~ ✅ เจ้าของอนุมัติ "ตามร่างทั้งหมด" 2026-07-02 — design docs อัปเดตเป็น approved แล้ว ทั้ง P3-1/P3-2 พร้อม implement | ✅ เสร็จ | — |
 | WP2 | Shared test vectors (`test/vectors.json` ใช้ร่วมสองพอร์ต), validate rules ตอนเรียก (แก้ JS เงียบ-fresh vs Py KeyError), ส่ง `decision` ผ่าน MCP `check_evidence` | P1 | 1 AI-day / 1 review-hr |
 
 ## 1. วิสัยทัศน์และจุดยืน

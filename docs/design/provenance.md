@@ -1,6 +1,6 @@
 # Design: Evidence Provenance (P3-1)
 
-Status: **draft for review** — no code yet. Companion to the decision log
+Status: **approved 2026-07-02** (all open questions resolved, see §9) — ready to implement. Companion to the decision log
 (`evidence-gate.decision/1`, shipped) — together they turn "the AI cited a ref"
 into "the system can prove what evidence the answer stood on."
 
@@ -111,6 +111,11 @@ New warning codes (existing levels; messages overridable via `rules.messages`):
 | `provenance_untrusted` | review | ≥1 record's authority < `minAuthority` |
 | `provenance_broken_chain` | review | ≥1 record fails §3 continuity |
 
+`minAuthority` is compared **per record** — one weak source taints the set
+with a caveat. It applies only to records that HAVE provenance (records
+without any are `provenance_missing` territory); a provenance block whose
+`source.authority` is absent counts as `"unverified"`.
+
 Deliberate scope cut for v1: provenance warnings **never change `status` or
 `allowedActions`** — they add caveats. Promoting them to status-level signals
 is a future rule (`escalate: true`) once real usage shows it's wanted.
@@ -118,13 +123,16 @@ Rationale: silently flipping `summarize` to `false` because of missing
 metadata would break every existing integration the day they add one
 provenance-bearing record.
 
-**Source-naming caveats.** When all records that have provenance agree on a
-source, the stale/quality caveat gains an attribution suffix, e.g.:
+**Source-naming caveats.** One rule: when the provenance-bearing records span
+**at most 2 distinct sources**, an attribution caveat names them, e.g.:
 
 > financial statements are based on sec-edgar (official), retrieved 2026-06-30.
 
-Emitted as its own `info` warning `provenance_attribution` so it composes with
-existing messages instead of rewriting them.
+With 3+ distinct sources the caveat is omitted (an unreadable list helps no
+one) — the full per-source breakdown still lands in
+`decision.provenance.sources` (§5) for auditors. Emitted as its own `info`
+warning `provenance_attribution` so it composes with existing messages
+instead of rewriting them.
 
 ## 5. Decision record additions (stays `evidence-gate.decision/1`)
 
@@ -140,9 +148,14 @@ decision.provenance = {
   covered: 3, total: 4,                      // records with provenance / all records
   sources: [ { id: "sec-edgar", type: "filing", authority: "official", records: 3 } ],
   brokenChains: 0,
-  digest: "fnv1a64:…",                       // evidenceDigest() of all provenance objects, in record order
+  digest: "fnv1a64:…",                       // evidenceDigest() of the provenance array, see below
 }
 ```
+
+The digest input is an array **positionally aligned with `records`**: element
+i is record i's provenance object, or `null` when record i has none. This
+keeps replay unambiguous — skipping provenance-less records would let two
+different evidence sets share a digest.
 
 - Privacy stance is inherited: no evidence values, no content excerpts. Source
   ids DO appear (auditors need them); apps that consider ids sensitive omit
@@ -202,12 +215,13 @@ Owner review: ~6 hrs total. Everything lands in the existing core files; no
 new dependencies; MCP server inherits it for free (`check_evidence` already
 passes `rules` through).
 
-## 9. Open questions (decide before implementing)
+## 9. Resolved decisions (2026-07-02, owner-approved)
 
-1. Should `minAuthority` compare per-record or against the *best* record?
-   (Draft says per-record — one weak source taints the set with a caveat.)
-2. Attribution caveat when records disagree on source: name the top-N sources
-   or stay silent? (Draft: silent when >2 distinct sources; counts still land
-   in `decision.provenance.sources`.)
-3. Python port: accept both `retrievedAt` and `retrieved_at` on input records,
-   or snake_case only? (Draft: snake_case only, consistent with existing port.)
+1. `minAuthority` compares **per record** — one weak source taints the set
+   with a caveat. Missing `source.authority` counts as `"unverified"` (§4).
+2. Attribution caveat names sources only when there are **≤2 distinct
+   sources**; silent otherwise, full breakdown always in
+   `decision.provenance.sources` (§4, §5).
+3. Python port accepts **snake_case only**, consistent with the existing port.
+4. *(from the logic review)* `decision.provenance.digest` hashes a
+   positionally-aligned array with `null` placeholders (§5).

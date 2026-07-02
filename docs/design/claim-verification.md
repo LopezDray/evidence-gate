@@ -1,6 +1,6 @@
 # Design: Post-generation Claim Verification — `verifyClaims` (P3-2)
 
-Status: **draft for review** — no code yet. Closes the loop that the gate
+Status: **approved 2026-07-02** (all open questions resolved, see §12) — ready to implement. Closes the loop that the gate
 opens: the gate decides *whether* the model may speak; `verifyClaims` checks
 *whether what it said stands on the evidence it was given*.
 
@@ -55,6 +55,9 @@ citationBlock(records)
 verifyClaims({
   answer,              // the model's text
   records,             // the SAME array the prompt was built from (order matters)
+  supporting?,         // the SAME supporting array passed to evidenceGate —
+                       //   citable (tagged, see §12.3) and REQUIRED for digest
+                       //   parity with the gate decision (§7)
   gate?,               // prior evidenceGate() result — enables freshness cross-checks
   rules?,              // verification knobs, see §5 (all optional)
   decision?,           // true | { id?, at? } — emit a verification record (§7)
@@ -62,7 +65,9 @@ verifyClaims({
 → {
   pass: boolean,                       // the one bit most apps need
   verdict: "supported" | "unsupported_claims" | "no_citations" | "phantom_citations",
-  citations: [ { marker: "ev:2", ref: "2", record: 1, valid: true } ],   // record = resolved index | null
+  citations: [ { marker: "ev:2", ref: "2", record: 1, tier: "primary", valid: true } ],
+               // record = resolved 0-BASED index into records/supporting | null
+               // tier = "primary" | "supporting" — strict apps may reject supporting-only claims
   claims:    [ { text, cited: true, markers: ["ev:2"] } ],               // claim-looking sentences only
   stats: { claims: 4, cited: 3, uncited: 1, phantom: 0 },
   warnings: [ { level, code, message } ],   // same shape as gate warnings
@@ -82,6 +87,13 @@ warnings→caveats mirroring.
   `\[ev:([A-Za-z0-9_.-]+)\]`.
 - Resolution order: exact match on `record.id` → else, if `<ref>` is an
   integer `1..records.length`, that index. Anything else is **phantom**.
+- **Integer-only ids are rejected**: `citationBlock` throws on a record whose
+  `id` matches `^\d+$` — it would be ambiguous against index refs. This is a
+  developer configuration error at prompt-build time, not messy model output,
+  so throwing (unlike the gate) is correct here.
+- Supporting records are citable too: `citationBlock(records, { supporting })`
+  lists them after the primary ones, markers continuing the same index space;
+  their resolved citations carry `tier: "supporting"`.
 - A marker binds to the sentence it appears in. Multiple markers per sentence
   are fine.
 
@@ -142,7 +154,9 @@ Opt-in via `decision`, mirroring the gate's decision log:
   id: "req-001",                      // caller-supplied — SAME id as the gate decision
   at: "2026-07-02T10:00:07Z",
   digests: {
-    evidence: "fnv1a64:…",            // identical function+input as the gate record → the join key
+    evidence: "fnv1a64:…",            // evidenceDigest({ records, supporting }) — identical
+                                      //   function+input as the gate record → the join key
+                                      //   (this is why §2 takes `supporting`)
     answer:   "fnv1a64:…",            // digest of the answer text; the text itself is NOT stored
   },
   verdict, pass,
@@ -217,13 +231,14 @@ Owner review ~6 hrs. No new dependencies; `record.id` addition is optional and
 backward-compatible; MCP server gains a `verify_claims` tool for free in a
 follow-up.
 
-## 12. Open questions (decide before implementing)
+## 12. Resolved decisions (2026-07-02, owner-approved)
 
-1. `requireFullCoverage` default **true** (strict; draft's choice — the whole
-   point is proof) or false (gentler adoption)?
-2. Marker syntax `[ev:…]` — collision risk with markdown footnote conventions
-   is low but nonzero; accept `⟦ev:…⟧` as an alternate grammar or keep one?
-   (Draft: one grammar only; two grammars = two ways to fail.)
-3. Should `verifyClaims` also accept `supporting` records as citable evidence,
-   or is citing supporting-only evidence itself a warning? (Draft: citable,
-   but tagged in `citations[].tier` so strict apps can reject.)
+1. `requireFullCoverage` defaults to **true** — the whole point is proof;
+   apps that want gentler behavior opt out explicitly.
+2. **One marker grammar only** (`[ev:…]`) — two grammars = two ways to fail.
+3. `supporting` records **are citable**, tagged `tier: "supporting"` in
+   `citations[]` so strict apps can reject them (§2, §3).
+4. *(from the logic review)* `verifyClaims` takes `supporting` so
+   `digests.evidence` is byte-identical to the gate decision's (§7);
+   `citations[].record` is a **0-based** index; integer-only `record.id`
+   values are rejected at `citationBlock` time (§3).
