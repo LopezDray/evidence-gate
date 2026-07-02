@@ -84,6 +84,31 @@ export const FINANCE = {
 
 Ships with `FINANCE`, `HEALTH`, and `SUPPORT` examples. Override any message via `rules.messages`.
 
+## Decision log — an audit trail for every gate call
+
+AI answers today come with references, but no **proof**: nothing shows the
+evidence behind an answer was complete, fresh, and authoritative when the
+model spoke. The gate is where that decision happens — so the gate can log it.
+
+Opt in with `decision` and every call also returns a JSONL-serializable
+decision record: which ruleset ran, a digest of the evidence it saw (the
+evidence itself is **not** stored — it may be sensitive), and the outcome.
+
+```js
+const gate = evidenceGate({
+  records,
+  rules: presets.FINANCE,
+  decision: { id: "req-001", at: new Date().toISOString() },
+});
+appendFileSync("decisions.jsonl", JSON.stringify(gate.decision) + "\n");
+```
+
+Later, prove a decision was made over a given evidence set by replaying its
+digest: `evidenceDigest({ records, supporting }) === logged.digests.evidence`.
+Digests are FNV-1a 64 over canonical JSON — deterministic and identical across
+the JS and Python ports (not cryptographic; they detect drift, not adversaries).
+See `examples/decision-log.mjs` for the full flow.
+
 ## Use it as an MCP server
 
 Give an agent a fact-checker it calls before it speaks. The package ships an MCP server exposing a `check_evidence` tool, so any MCP-compatible agent (Claude, IDE assistants, etc.) can gate itself.

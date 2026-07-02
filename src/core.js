@@ -87,11 +87,46 @@ export function deriveAllowedActions({ primaryStatus, supportingPresent = false,
   return actions;
 }
 
+// ── Decision log primitives ───────────────────────────────────────────────────
+// A decision record is the audit trail of one gate call: WHAT the gate decided,
+// under WHICH rules, over WHICH evidence — without storing the evidence itself
+// (records may be sensitive; only a digest of them is kept).
+//
+// Digests are FNV-1a 64-bit over canonical JSON. Deterministic and identical
+// across the JS and Python ports; NOT cryptographic — they detect drift and
+// correlate log entries, they don't prove integrity against an adversary.
+
+export const DECISION_SCHEMA = "evidence-gate.decision/1";
+
+export function canonicalJson(value) {
+  if (value === undefined) return "null";
+  if (value === null || typeof value !== "object") return JSON.stringify(value);
+  if (Array.isArray(value)) return "[" + value.map(canonicalJson).join(",") + "]";
+  const keys = Object.keys(value).filter((k) => value[k] !== undefined).sort();
+  return "{" + keys.map((k) => JSON.stringify(k) + ":" + canonicalJson(value[k])).join(",") + "}";
+}
+
+export function fnv1a64(str) {
+  let hash = 0xcbf29ce484222325n;
+  for (const byte of new TextEncoder().encode(str)) {
+    hash ^= BigInt(byte);
+    hash = (hash * 0x100000001b3n) & 0xffffffffffffffffn;
+  }
+  return hash.toString(16).padStart(16, "0");
+}
+
+export function evidenceDigest(value) {
+  return "fnv1a64:" + fnv1a64(canonicalJson(value));
+}
+
 // ── evidenceGate: the one-call API ────────────────────────────────────────────
-//   evidenceGate({ records, supporting, rules })
-//     → { status, freshness, allowedActions, warnings, caveats }
+//   evidenceGate({ records, supporting, rules, decision? })
+//     → { status, freshness, allowedActions, warnings, caveats, decision? }
 //   `caveats` is a list of strings ready to inject into your prompt.
-export function evidenceGate({ records = [], supporting = [], rules } = {}) {
+//   `decision` (opt-in): pass `true` or `{ id?, at? }` to also get a
+//   JSONL-serializable decision record for your audit log. The core never
+//   writes anywhere — persisting the record is the caller's job.
+export function evidenceGate({ records = [], supporting = [], rules, decision } = {}) {
   if (!rules) throw new Error("evidenceGate: `rules` (a preset) is required");
 
   const primary = classifyStatus(records, rules);
@@ -116,5 +151,32 @@ export function evidenceGate({ records = [], supporting = [], rules } = {}) {
   if (!supportingPresent)
     warnings.push({ level: "info", code: "no_supporting", message: M.no_supporting || "No supporting evidence — primary source only." });
 
-  return { status: primary.status, freshness: primary.freshness, allowedActions, warnings, caveats: warnings.map((w) => w.message) };
+  const result = { status: primary.status, freshness: primary.freshness, allowedActions, warnings, caveats: warnings.map((w) => w.message) };
+
+  if (decision) {
+    const meta = decision === true ? {} : decision;
+    result.decision = {
+      schema: DECISION_SCHEMA,
+      id: meta.id ?? null,
+      at: meta.at ?? new Date().toISOString(),
+      digests: { evidence: evidenceDigest({ records, supporting }), rules: evidenceDigest(rules) },
+      counts: { records: records.length, supporting: (supporting || []).length },
+      rules: {
+        primaryLabel: label,
+        staleDays: rules.staleDays ?? null,
+        minRecords: rules.minRecords ?? null,
+        qualityThreshold: rules.qualityThreshold ?? null,
+        forbiddenActions: rules.forbiddenActions || [],
+      },
+      outcome: {
+        status: primary.status,
+        freshness: primary.freshness,
+        allowedActions,
+        warnings: warnings.map(({ level, code }) => ({ level, code })),
+        caveats: result.caveats,
+      },
+    };
+  }
+
+  return result;
 }
