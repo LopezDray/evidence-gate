@@ -8,6 +8,23 @@
 
 ---
 
+## 0. สถานะล่าสุด (2026-07-02)
+
+| งาน | สถานะ |
+|---|---|
+| P1-1 Decision log / audit trail | ✅ เสร็จ + ซ่อม null-records crash และ align สองพอร์ต (#3) |
+| P3-1 Provenance — schema | ✏️ design doc เสร็จ: `docs/design/provenance.md` (รอปิด open questions) |
+| P3-2 verifyClaims — API | ✏️ design doc เสร็จ: `docs/design/claim-verification.md` (รอปิด open questions) |
+| P0-2 CI | ⚙️ workflow มีอยู่แล้ว อัปเดตให้รันครบทุก suite แล้ว — เหลือ badge บน README |
+| Logic review รอบ Fable 5 | ✅ เจอ+ซ่อมบั๊ก 3 จุด, พบ divergence เดิม 1 จุด (rules validation) และช่องว่าง spec 6 ข้อ — เข้าแผนเป็น WP1/WP2 ด้านล่าง |
+
+**งานใหม่จากผลรีวิว (แทรกก่อน implement Phase 3):**
+
+| ID | งาน | Priority | Effort |
+|---|---|---|---|
+| WP1 | ปิด open questions ทั้งหมดของสอง design docs + spec gaps จากรีวิว (supporting ใน verifyClaims, provenance digest placeholder, กติกา attribution เดียว, ห้าม id ตัวเลขล้วน, 0-based index) | P0 ก่อนเริ่ม P3-1/P3-2 | 1–2 review-hrs |
+| WP2 | Shared test vectors (`test/vectors.json` ใช้ร่วมสองพอร์ต), validate rules ตอนเรียก (แก้ JS เงียบ-fresh vs Py KeyError), ส่ง `decision` ผ่าน MCP `check_evidence` | P1 | 1 AI-day / 1 review-hr |
+
 ## 1. วิสัยทัศน์และจุดยืน
 
 **ปัญหา**: ทุกวันนี้ AI ตอบโดยมีแค่ "ref" — ลิงก์อ้างอิง — แต่ไม่มี**การพิสูจน์เชิงข้อมูล**ว่า
