@@ -8,15 +8,20 @@
 
 ---
 
-## 0. สถานะล่าสุด (2026-07-02)
+## 0. สถานะล่าสุด (2026-07-10)
 
 | งาน | สถานะ |
 |---|---|
+| P0-1 PyPI name collision | ✅ เสร็จ — publish `evidence-gate-py` แล้ว, repo + README ตรงกัน (README เตือนว่า import ยังเป็น `from evidence_gate import ...`) |
+| P0-2 CI | ⚙️ workflow รันครบทุก suite แล้ว — เหลือ badge บน README (#2) |
 | P1-1 Decision log / audit trail | ✅ เสร็จ + ซ่อม null-records crash และ align สองพอร์ต (#3) |
-| P3-1 Provenance — schema | ✏️ design doc เสร็จ: `docs/design/provenance.md` (รอปิด open questions) |
-| P3-2 verifyClaims — API | ✏️ design doc เสร็จ: `docs/design/claim-verification.md` (รอปิด open questions) |
-| P0-2 CI | ⚙️ workflow มีอยู่แล้ว อัปเดตให้รันครบทุก suite แล้ว — เหลือ badge บน README |
+| P1-2 Release v0.2.0 | ✅ เสร็จ — npm `evidence-gate@0.2.0` + PyPI `evidence-gate-py@0.2.0`, CHANGELOG, merge เข้า main, tag `v0.2.0` → `662a832` (#4) |
+| P1-4 Launch | 📝 ร่างโพสต์ Show HN / Reddit (r/LocalLLaMA, r/RAG) / X พร้อมแล้ว — รอเจ้าของโพสต์ + ตอบคอมเมนต์ 48 ชม. (#6) |
+| P3-1 Provenance — schema | ✏️ spec **approved** (#8) — พร้อม implement ตาม plan §8 |
+| P3-2 verifyClaims — API | ✏️ spec **approved** (#8) — พร้อม implement ตาม plan §11 |
 | Logic review รอบ Fable 5 | ✅ เจอ+ซ่อมบั๊ก 3 จุด, พบ divergence เดิม 1 จุด (rules validation) และช่องว่าง spec 6 ข้อ — เข้าแผนเป็น WP1/WP2 ด้านล่าง |
+
+**Phase 1 ปิดครบ (เว้น P1-4 launch ที่รอเจ้าของโพสต์)** → งานถัดไปคือ **Phase 3** ให้ session ใหม่ (Fable) วางแผน+ทำต่อ ดู [`docs/phase3-kickoff.md`](phase3-kickoff.md)
 
 **งานใหม่จากผลรีวิว (แทรกก่อน implement Phase 3):**
 
