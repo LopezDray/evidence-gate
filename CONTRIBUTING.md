@@ -19,6 +19,13 @@ python python/tests/test_core.py  # Python
 
 The JS (`src/`) and Python (`python/`) ports implement the same logic. If you change a rule, change both and update both test suites.
 
+## Releasing
+
+`python/README.md` is a copy of the root `README.md` — the PyPI build
+(`python -m build`) needs it inside `python/` and can't reach the repo root from
+its isolated build env. **If you edit the root README, copy it over before
+publishing:** `cp README.md python/README.md`.
+
 ## What's welcome
 
 - New presets for domains we don't cover (legal, insurance, etc.)
