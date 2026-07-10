@@ -10,6 +10,7 @@ authors = [{ name = "LopezDray" }]
 
 [project.urls]
 Homepage = "https://github.com/LopezDray/evidence-gate"
+"Live Example" = "https://daddyinvestor.net"
 
 [build-system]
 requires = ["hatchling"]
