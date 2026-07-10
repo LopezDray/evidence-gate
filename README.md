@@ -51,8 +51,12 @@ It is fully **domain-agnostic**. The same engine works for finance, healthcare, 
 ```bash
 npm install evidence-gate
 # or
-pip install evidence-gate
+pip install evidence-gate-py
 ```
+
+> The PyPI package is **`evidence-gate-py`** (the plain `evidence-gate` name on
+> PyPI belongs to an unrelated project). The import name is unchanged —
+> `from evidence_gate import evidence_gate, presets`.
 
 ## Records
 
