@@ -131,7 +131,7 @@ The tool accepts `{ records, supporting?, preset?, rules? }` and returns the gat
 
 ## Why trust it
 
-The engine is intentionally small and pure — no network, no dependencies, all logic unit-tested. It runs in production today inside a financial-data application, gating an LLM over real, messy, sometimes-missing filings.
+The engine is intentionally small and pure — no network, no dependencies, all logic unit-tested. It runs in production today inside [DaddyInvestor](https://daddyinvestor.net), a Thai-language financial-data application, gating an LLM over real, messy, sometimes-missing SEC filings.
 
 ## License
 
