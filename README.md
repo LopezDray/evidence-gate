@@ -1,5 +1,10 @@
 # Evidence Gate
 
+[![test](https://github.com/LopezDray/evidence-gate/actions/workflows/test.yml/badge.svg)](https://github.com/LopezDray/evidence-gate/actions/workflows/test.yml)
+[![npm](https://img.shields.io/npm/v/evidence-gate)](https://www.npmjs.com/package/evidence-gate)
+[![PyPI](https://img.shields.io/pypi/v/evidence-gate-py)](https://pypi.org/project/evidence-gate-py/)
+[![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 **Stop your AI from making up facts about your own data.**
 
 A tiny, zero-dependency gate you call **before** an LLM generates anything. It looks at the records you actually have and returns whether the model may summarize, whether the data is stale or low-quality, and the exact caveats to inject into your prompt.

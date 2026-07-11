@@ -2,11 +2,12 @@
 
 ## พร้อมทำ (เรียงตามลำดับ)
 
-1. **P3-3 Release v1.0 + case study** — CHANGELOG `[Unreleased]` มีเนื้อครบแล้ว
-   · Claude เตรียมได้ถึงข้อ 7 ของ `.claude/skills/release-checklist.md`
-   · **ติดเจ้าของ**: publish npm/PyPI + tag + เนื้อหา case study จาก DaddyInvestor
-   · อย่าลืม: bump version 4 จุด (ดู checklist — sync เป็น 0.2.0 ครบแล้ว 2026-07-11)
-2. **P0-2 CI badge** — เพิ่ม badge บน README (#2) — งานเล็ก ทำแทรกได้
+1. **P3-3 Release v1.0** — prep เสร็จถึงข้อ 7 แล้ว (bump 1.0.0, CHANGELOG `[1.0.0]`,
+   release notes `docs/release-notes-v1.0.md`) รอ merge PR แล้ว **ติดเจ้าของล้วน**:
+   ข้อ 8-11 ของ `release-checklist.md` = tag `v1.0.0` + `npm publish` + PyPI + GitHub Release
+   · **case study**: `docs/case-study-daddyinvestor.md` เป็น skeleton — เจ้าของเติมตัวเลขจริง
+   (ห้ามแต่งเลข) แล้วค่อยลิงก์จาก README
+2. ~~P0-2 CI badge~~ ✅ เสร็จ (README badges test/npm/PyPI/license)
 
 ## ติดเจ้าของล้วน (Claude ไม่ต้องแตะ)
 

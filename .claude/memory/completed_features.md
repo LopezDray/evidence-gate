@@ -1,5 +1,8 @@
 # Completed — entry ใหม่บนสุด · เก็บ ≤30 entry เกินให้ย้ายไป archive/
 
+- **2026-07-11 · P0-2 CI badge + P3-3 prep** — README badges (test/npm/PyPI/license, #2) ·
+  bump version → 1.0.0 ครบ 4 จุด · CHANGELOG `[1.0.0]` + breaking note (rules validation) ·
+  release notes + case study skeleton (`docs/`) · **เหลือเจ้าของ: publish + tag + เติม case study**
 - **2026-07-11 · ระบบปฏิบัติงาน Claude** — CLAUDE.md + .claude/skills/ (4 ไฟล์) +
   .claude/memory/ + SessionStart hook · ปรับจาก MASTER_BOOTSTRAP_PROMPT ของ DaddyInvestor
   · merge แล้วใน PR #13 (`9fa5af0`) · drive-by: sync version 0.2.0 ที่ค้าง (`__init__.py`, mcp server)
