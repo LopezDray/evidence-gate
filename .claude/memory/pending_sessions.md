@@ -21,4 +21,4 @@
 - MCP server ควรได้ tool `verify_claims` (spec §11 บอก "for free in a follow-up")
 - `evidenceGate` ยังไม่รับ `supporting` ผ่าน MCP `check_evidence` แบบมี tier ใน docs — เช็คตอนทำ verify_claims tool
 
-_อัปเดตล่าสุด: 2026-07-11 (session Fable — Phase 3 implement ครบ + สร้างระบบปฏิบัติงาน)_
+_อัปเดตล่าสุด: 2026-07-11 (Phase 3 implement ครบ + ระบบปฏิบัติงาน merge PR #13 · main = `9fa5af0`)_

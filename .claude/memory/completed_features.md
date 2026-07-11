@@ -2,6 +2,7 @@
 
 - **2026-07-11 · ระบบปฏิบัติงาน Claude** — CLAUDE.md + .claude/skills/ (4 ไฟล์) +
   .claude/memory/ + SessionStart hook · ปรับจาก MASTER_BOOTSTRAP_PROMPT ของ DaddyInvestor
+  · merge แล้วใน PR #13 (`9fa5af0`) · drive-by: sync version 0.2.0 ที่ค้าง (`__init__.py`, mcp server)
 - **2026-07-11 · P3-1 Provenance** — `validateProvenance`/chain rules + `rules.provenance`
   warnings + attribution + `decision.provenance` (digest replay ได้) + `examples/provenance.mjs`
   · merge แล้วใน PR #12 (`5a7d37b`)
