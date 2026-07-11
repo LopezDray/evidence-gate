@@ -6,7 +6,7 @@
   + `stats.misquoted` · เลขไทย ๐-๙ เข้า default claimPatterns (vector เดิมอัปเดตแบบตั้งใจ) ·
   magnitude K/M/B + พัน…ล้านล้าน ผ่าน decimal-point-shift (ห้ามคูณ float — parity #9 ใหม่) ·
   vectors ใหม่ 12 เคส + unit tests สองพอร์ต · design §8 → full spec (เจ้าของเคาะ 4 trade-off) ·
-  branch `claude/fable-fact-check-c7yt0b` → **PR #16 เปิดแล้ว รอเจ้าของ review/merge**
+  **merged PR #16 (`f1a2985`)** · อยู่ใน CHANGELOG `[Unreleased]` — ยังไม่ bump version
 - **2026-07-11 · Tamper-evident decision chain** — `chainDecision`/`verifyDecisionChain`
   (+ Python) · hash-chain decision log, `prev` additive (schema ยัง /1) · vectors
   `decisionChain` ล็อก digest สองพอร์ต · `examples/tamper-evident-log.mjs` ·
