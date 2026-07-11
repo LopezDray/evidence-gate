@@ -71,6 +71,19 @@ t("classifyStatus without rules throws clearly (not undefined-crash)", () => {
   let threw = false; try { classifyStatus([{date:"2026-01-01"}]); } catch { threw = true; }
   if (!threw) throw new Error("should throw without rules");
 });
+t("incomplete rules throw naming the missing field (no silent-fresh)", () => {
+  let msg = "";
+  try { classifyStatus([{ date: "2026-01-01" }], { staleDays: 30 }); } catch (e) { msg = e.message; }
+  if (!msg.includes("rules.minRecords")) throw new Error(`expected rules.minRecords in error, got: ${msg}`);
+  msg = "";
+  try { evidenceGate({ records: [], rules: { staleDays: 30 } }); } catch (e) { msg = e.message; }
+  if (!msg.includes("rules.minRecords")) throw new Error(`validation must fire even with empty records, got: ${msg}`);
+});
+t("explicit null optional rule fields behave like absent", () => {
+  const r = evidenceGate({ records: [{ date: "2026-01-01" }],
+    rules: { staleDays: 30, minRecords: 1, qualityThreshold: 50, forbiddenActions: null, messages: null, primaryLabel: null } });
+  eq(r.status, "available");
+});
 t("null records / undefined args safe", () => {
   eq(classifyStatus(null, R).status, "missing");
   eq(evidenceGate({ rules: FINANCE }).status, "missing");

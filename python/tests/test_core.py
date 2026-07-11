@@ -1,14 +1,35 @@
 """Evidence Gate — core tests: python -m pytest  (or: python tests/test_core.py)"""
+import json
 import os
 import sys
 from datetime import date, timedelta
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from evidence_gate.core import (
-    classify_status, derive_allowed_actions, evidence_gate,
+    classify_status, derive_allowed_actions, evidence_gate, validate_rules,
     canonical_json, fnv1a64, evidence_digest, DECISION_SCHEMA,
 )
 from evidence_gate.presets import FINANCE, HEALTH
+
+# Shared cross-port vectors (test/vectors.json) are written in the JS port's
+# camelCase convention; these maps translate to this port's snake_case.
+VECTORS_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "test", "vectors.json")
+RULES_KEY_MAP = {
+    "staleDays": "stale_days",
+    "minRecords": "min_records",
+    "qualityThreshold": "quality_threshold",
+    "primaryLabel": "primary_label",
+    "forbiddenActions": "forbidden_actions",
+    "messages": "messages",
+}
+RECORD_KEY_MAP = {"qualityScore": "quality_score"}
+
+
+def _map_keys(obj, key_map):
+    """Translate top-level dict keys only; values (incl. nested dicts) pass through."""
+    if isinstance(obj, dict):
+        return {key_map.get(k, k): v for k, v in obj.items()}
+    return obj
 
 
 def iso(days_ago):
@@ -100,7 +121,75 @@ def test_decision_record():
     assert g_none["decision"]["counts"]["records"] == 0
 
 
+def test_rules_validation():
+    # explicit None for optional fields behaves like the JS port's null (absent)
+    ok_rules = {"stale_days": 30, "min_records": 1, "quality_threshold": 50,
+                "forbidden_actions": None, "messages": None, "primary_label": None}
+    g = evidence_gate(records=[{"date": "2026-01-01"}], rules=ok_rules)
+    assert g["status"] == "available"
+    assert validate_rules(ok_rules) is ok_rules  # returns rules for chaining
+
+    # classify_status validates too — incomplete rules can never silently pass
+    try:
+        classify_status([{"date": "2026-01-01"}], {"stale_days": 30})
+        raise AssertionError("classify_status must reject incomplete rules")
+    except ValueError as err:
+        assert "min_records" in str(err)
+
+    # validation fires even with empty records (the old JS silent-fresh hole)
+    try:
+        evidence_gate(records=[], rules={"stale_days": 30})
+        raise AssertionError("evidence_gate must reject incomplete rules")
+    except ValueError:
+        pass
+
+
+def test_shared_vectors():
+    """Run test/vectors.json — the same file the JS suite runs. A failure here
+    (with the JS side green) means the two ports have diverged."""
+    with open(VECTORS_PATH, encoding="utf-8") as f:
+        vectors = json.load(f)
+
+    for v in vectors["fnv1a64"]:
+        assert fnv1a64(v["input"]) == v["expected"], v["input"]
+
+    for v in vectors["canonicalJson"]:
+        assert canonical_json(v["value"]) == v["expected"], v["name"]
+
+    for v in vectors["digest"]:
+        assert evidence_digest(v["value"]) == v["expected"], v["name"]
+
+    for c in vectors["gate"]:
+        name = c["name"]
+        records = [_map_keys(r, RECORD_KEY_MAP) for r in c["records"]]
+        supporting = [_map_keys(r, RECORD_KEY_MAP) for r in c["supporting"]]
+        rules = _map_keys(c["rules"], RULES_KEY_MAP)
+        g = evidence_gate(records=records, supporting=supporting, rules=rules, decision=True)
+        e = c["expected"]
+        assert g["status"] == e["status"], name
+        assert g["freshness"] == e["freshness"], name
+        assert g["allowed_actions"] == e["allowedActions"], name
+        got_warnings = [{"level": w["level"], "code": w["code"]} for w in g["warnings"]]
+        assert got_warnings == e["warnings"], name
+        if "caveats" in e:
+            assert g["caveats"] == e["caveats"], name
+        if "evidenceDigest" in e:
+            # byte-identical digest across ports — the audit-trail guarantee
+            assert g["decision"]["digests"]["evidence"] == e["evidenceDigest"], name
+
+    for c in vectors["invalidRules"]:
+        rules = _map_keys(c["rules"], RULES_KEY_MAP)
+        try:
+            evidence_gate(records=[], rules=rules)
+            raise AssertionError(f"invalid rules case {c['name']} did not raise")
+        except ValueError as err:
+            if c["errorField"] is not None:
+                field = RULES_KEY_MAP[c["errorField"]]
+                assert f'rules["{field}"]' in str(err), (c["name"], str(err))
+
+
 if __name__ == "__main__":
     test_classify(); test_allowed_actions(); test_date_validation(); test_domain_swap()
     test_digest_primitives(); test_decision_record()
+    test_rules_validation(); test_shared_vectors()
     print("all tests passed")

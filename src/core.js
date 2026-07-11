@@ -37,11 +37,37 @@ export function freshnessLabel(latest, thresholdDays) {
   return age > thresholdDays ? "stale" : "fresh";
 }
 
+// ── validateRules: fail fast on malformed rulesets ────────────────────────────
+// Both ports validate rules at call time and throw the same way, so a bad
+// ruleset can never silently pass one port (JS used to treat missing numeric
+// fields as permissive: `age > undefined` is false → everything looked fresh)
+// while crashing the other (Python raised KeyError). Explicit null is treated
+// like an absent optional field, matching Python's `None`.
+const RULE_NUMBER_FIELDS = ["staleDays", "minRecords", "qualityThreshold"];
+
+export function validateRules(rules, caller = "evidenceGate") {
+  if (!rules || typeof rules !== "object" || Array.isArray(rules))
+    throw new Error(`${caller}: \`rules\` (a preset) is required`);
+  for (const f of RULE_NUMBER_FIELDS) {
+    const v = rules[f];
+    if (typeof v !== "number" || !Number.isFinite(v))
+      throw new Error(`${caller}: rules.${f} is required and must be a finite number`);
+  }
+  if (rules.forbiddenActions != null && !Array.isArray(rules.forbiddenActions))
+    throw new Error(`${caller}: rules.forbiddenActions must be an array`);
+  if (rules.messages != null && (typeof rules.messages !== "object" || Array.isArray(rules.messages)))
+    throw new Error(`${caller}: rules.messages must be an object`);
+  if (rules.primaryLabel != null && typeof rules.primaryLabel !== "string")
+    throw new Error(`${caller}: rules.primaryLabel must be a string`);
+  return rules;
+}
+
 // ── classifyStatus: records[] + rules → status of the primary evidence group ──
 //   rules: { staleDays, minRecords, qualityThreshold }
 //   returns: { status, freshness, latest, count, qualityMin, flags }
 //   status: "available" | "quality_warning" | "fallback" | "missing"
 export function classifyStatus(records, rules) {
+  validateRules(rules, "classifyStatus");
   const usable = records || [];
   if (!usable.length) {
     return { status: "missing", freshness: "unknown", latest: null, count: 0, qualityMin: null, flags: [] };
@@ -83,7 +109,7 @@ export function deriveAllowedActions({ primaryStatus, supportingPresent = false,
   const summarize = ["available", "quality_warning", "fallback"].includes(primaryStatus) || supportingPresent;
   const compare = ["available", "quality_warning"].includes(primaryStatus);
   const actions = { summarize, compare };
-  for (const a of forbiddenActions) actions[a] = false; // hard rule: always false
+  for (const a of forbiddenActions || []) actions[a] = false; // hard rule: always false; `|| []` because a default param doesn't cover null (Python: `or []`)
   return actions;
 }
 
@@ -131,7 +157,7 @@ export function evidenceDigest(value) {
 //   JSONL-serializable decision record for your audit log. The core never
 //   writes anywhere — persisting the record is the caller's job.
 export function evidenceGate({ records = [], supporting = [], rules, decision } = {}) {
-  if (!rules) throw new Error("evidenceGate: `rules` (a preset) is required");
+  validateRules(rules, "evidenceGate");
   records = records || []; // null must behave like [] everywhere, incl. digests (Python port: `records or []`)
   supporting = supporting || [];
 

@@ -88,6 +88,12 @@ export const FINANCE = {
 
 Ships with `FINANCE`, `HEALTH`, and `SUPPORT` examples. Override any message via `rules.messages`.
 
+Rules are **validated at call time**: `staleDays`, `minRecords`, and
+`qualityThreshold` are required finite numbers, and both ports throw the same
+clear error naming the offending field. An incomplete ruleset can never
+silently pass (previously the JS port treated missing fields as permissive —
+everything looked fresh — while Python raised a bare `KeyError`).
+
 ## Decision log — an audit trail for every gate call
 
 AI answers today come with references, but no **proof**: nothing shows the
@@ -131,11 +137,16 @@ Register it with your client:
 }
 ```
 
-The tool accepts `{ records, supporting?, preset?, rules? }` and returns the gate result. Instruct your agent to call it first and refuse to answer when `allowedActions.summarize` is `false`.
+The tool accepts `{ records, supporting?, preset?, rules?, decision? }` and returns the gate result. Instruct your agent to call it first and refuse to answer when `allowedActions.summarize` is `false`.
+
+Pass `decision: true` (or `decision: { id, at }`) to get the same audit-trail
+decision record as the library API, inside the tool result — so gate calls made
+through MCP are just as provable as direct ones. Persisting the record is the
+caller's job, same as the library.
 
 ## Why trust it
 
-The engine is intentionally small and pure — no network, no dependencies, all logic unit-tested. It runs in production today inside [DaddyInvestor](https://daddyinvestor.net), a Thai-language financial-data application, gating an LLM over real, messy, sometimes-missing SEC filings.
+The engine is intentionally small and pure — no network, no dependencies, all logic unit-tested. The JS and Python ports are locked together by a shared vector file (`test/vectors.json`) that both test suites run — statuses, warning order, prompt caveats, and evidence digests must match byte-for-byte, so the audit trail cannot drift between ports. It runs in production today inside [DaddyInvestor](https://daddyinvestor.net), a Thai-language financial-data application, gating an LLM over real, messy, sometimes-missing SEC filings.
 
 ## License
 

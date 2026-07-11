@@ -51,6 +51,17 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
             type: "object",
             description: "Optional inline ruleset; overrides `preset` if provided.",
           },
+          decision: {
+            type: ["boolean", "object"],
+            description:
+              "Opt in to a JSONL-serializable decision record for your audit log: " +
+              "pass true, or { id?, at? } to attach a caller id / timestamp. " +
+              "The record comes back as `decision` in the result; persisting it is your job.",
+            properties: {
+              id: { type: ["string", "number", "null"], description: "Caller-supplied correlation id." },
+              at: { type: "string", description: "ISO 8601 timestamp; defaults to now." },
+            },
+          },
         },
         required: ["records"],
       },
@@ -62,10 +73,16 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
   if (req.params.name !== "check_evidence") {
     throw new Error(`Unknown tool: ${req.params.name}`);
   }
-  const { records = [], supporting = [], preset = "SUPPORT", rules } = req.params.arguments || {};
+  const { records = [], supporting = [], preset = "SUPPORT", rules, decision } = req.params.arguments || {};
   const ruleset = rules || presets[preset] || presets.SUPPORT;
-  const result = evidenceGate({ records, supporting, rules: ruleset });
-  return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+  try {
+    const result = evidenceGate({ records, supporting, rules: ruleset, decision });
+    return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+  } catch (err) {
+    // e.g. an inline ruleset that fails validateRules — surface as a tool
+    // error the agent can read, not a broken protocol response
+    return { content: [{ type: "text", text: String(err?.message ?? err) }], isError: true };
+  }
 });
 
 const transport = new StdioServerTransport();

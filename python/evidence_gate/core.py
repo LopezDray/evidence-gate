@@ -8,6 +8,7 @@ No dependencies. Domain-agnostic: bring records + a ruleset (preset).
     record = {"date", "quality_score"?, "quality"?, "flags"?, "tier"?}
 """
 import json
+import math
 from datetime import datetime, date, timezone
 
 # ── Decision log primitives ──────────────────────────────────────────────────
@@ -64,12 +65,42 @@ def freshness_label(latest, threshold_days):
     return "stale" if age > threshold_days else "fresh"
 
 
+# ── validate_rules: fail fast on malformed rulesets ──────────────────────────
+# Both ports validate rules at call time and throw the same way, so a bad
+# ruleset can never silently pass one port (JS used to treat missing numeric
+# fields as permissive) while crashing the other (Python raised KeyError).
+# Explicit None is treated like an absent optional field, matching JS `null`.
+_RULE_NUMBER_FIELDS = ("stale_days", "min_records", "quality_threshold")
+
+
+def validate_rules(rules, caller="evidence_gate"):
+    # `{}` is falsy in Python but not in JS — check identity/type, not truthiness,
+    # so an empty dict gets the same "which field is missing" error as JS's `{}`
+    if rules is None or not isinstance(rules, dict):
+        raise ValueError(f"{caller}: `rules` (a preset) is required")
+    for f in _RULE_NUMBER_FIELDS:
+        v = rules.get(f)
+        if isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v):
+            raise ValueError(f'{caller}: rules["{f}"] is required and must be a finite number')
+    fa = rules.get("forbidden_actions")
+    if fa is not None and not isinstance(fa, list):
+        raise ValueError(f'{caller}: rules["forbidden_actions"] must be a list')
+    m = rules.get("messages")
+    if m is not None and not isinstance(m, dict):
+        raise ValueError(f'{caller}: rules["messages"] must be a dict')
+    label = rules.get("primary_label")
+    if label is not None and not isinstance(label, str):
+        raise ValueError(f'{caller}: rules["primary_label"] must be a string')
+    return rules
+
+
 def classify_status(records, rules):
     """records[] + rules -> status of the primary evidence group.
 
     rules: {"stale_days", "min_records", "quality_threshold"}
     status: "available" | "quality_warning" | "fallback" | "missing"
     """
+    validate_rules(rules, "classify_status")
     usable = records or []
     if not usable:
         return {"status": "missing", "freshness": "unknown", "latest": None,
@@ -129,16 +160,16 @@ def evidence_gate(records=None, supporting=None, rules=None, decision=None):
     get a JSONL-serializable decision record for your audit log. The core never
     writes anywhere — persisting the record is the caller's job.
     """
-    if not rules:
-        raise ValueError("evidence_gate: `rules` (a preset) is required")
+    validate_rules(rules, "evidence_gate")
 
     primary = classify_status(records or [], rules)
     supporting_present = bool(supporting or [])
     allowed = derive_allowed_actions(primary["status"], supporting_present, rules.get("forbidden_actions"))
 
     warnings = []
-    m = rules.get("messages", {})
-    label = rules.get("primary_label", "primary data")
+    # `or` (not dict-default) so an explicit None behaves like the JS port's null
+    m = rules.get("messages") or {}
+    label = rules.get("primary_label") or "primary data"
     st = primary["status"]
     if st == "missing":
         warnings.append({"level": "block", "code": "primary_missing",

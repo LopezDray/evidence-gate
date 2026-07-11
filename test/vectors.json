@@ -1,0 +1,379 @@
+{
+  "schema": "evidence-gate.test-vectors/1",
+  "comment": [
+    "Shared cross-port test vectors. Loaded by BOTH test/vectors.test.mjs (JS)",
+    "and python/tests/test_core.py (Python). Records/rules/expectations are",
+    "written in the JS port's camelCase convention; the Python harness maps",
+    "keys via its KEY_MAP (staleDays -> stale_days, qualityScore ->",
+    "quality_score, ...). Every `evidenceDigest` expectation uses only",
+    "port-neutral record keys (date/tier/flags/quality), so the digest MUST",
+    "be byte-identical across the two ports. Do not edit expected values to",
+    "make a port pass — a mismatch here means the ports have diverged."
+  ],
+  "fnv1a64": [
+    { "input": "", "expected": "cbf29ce484222325" },
+    { "input": "a", "expected": "af63dc4c8601ec8c" },
+    { "input": "foobar", "expected": "85944171f73967e8" },
+    { "input": "สวัสดี", "expected": "3e0dcf56d00e781a" }
+  ],
+  "canonicalJson": [
+    {
+      "name": "sorted-keys-unicode-kept",
+      "value": { "b": 2, "a": [1, "é", true], "z": null },
+      "expected": "{\"a\":[1,\"é\",true],\"b\":2,\"z\":null}"
+    },
+    {
+      "name": "nested-object-thai-float",
+      "value": { "z": { "b": 1, "a": [true, false, null] }, "k": "สวัสดี", "n": 1.5 },
+      "expected": "{\"k\":\"สวัสดี\",\"n\":1.5,\"z\":{\"a\":[true,false,null],\"b\":1}}"
+    },
+    { "name": "empty-object", "value": {}, "expected": "{}" },
+    { "name": "empty-array", "value": [], "expected": "[]" },
+    { "name": "plain-array", "value": [1, 2, 3], "expected": "[1,2,3]" }
+  ],
+  "digest": [
+    {
+      "name": "shared-reference-object",
+      "value": { "b": 2, "a": [1, "é", true], "z": null },
+      "expected": "fnv1a64:2a4b821432ab8bcc"
+    },
+    {
+      "name": "nested-object-thai-float",
+      "value": { "z": { "b": 1, "a": [true, false, null] }, "k": "สวัสดี", "n": 1.5 },
+      "expected": "fnv1a64:8cc778cdb3a6aad9"
+    },
+    { "name": "empty-object", "value": {}, "expected": "fnv1a64:08f44b07b5901a25" },
+    { "name": "plain-array", "value": [1, 2, 3], "expected": "fnv1a64:28bbee4398699f19" },
+    {
+      "name": "empty-evidence-set",
+      "value": { "records": [], "supporting": [] },
+      "expected": "fnv1a64:b154377d61167670"
+    }
+  ],
+  "gate": [
+    {
+      "name": "missing-no-records",
+      "records": [],
+      "supporting": [],
+      "rules": {
+        "primaryLabel": "test data",
+        "staleDays": 1000000,
+        "minRecords": 4,
+        "qualityThreshold": 70,
+        "forbiddenActions": ["personalized_advice", "claim_realtime"]
+      },
+      "expected": {
+        "status": "missing",
+        "freshness": "unknown",
+        "allowedActions": {
+          "summarize": false,
+          "compare": false,
+          "personalized_advice": false,
+          "claim_realtime": false
+        },
+        "warnings": [
+          { "level": "block", "code": "primary_missing" },
+          { "level": "info", "code": "no_supporting" }
+        ],
+        "caveats": [
+          "No test data available — the AI must not invent numbers.",
+          "No supporting evidence — primary source only."
+        ],
+        "evidenceDigest": "fnv1a64:b154377d61167670"
+      }
+    },
+    {
+      "name": "missing-with-supporting",
+      "records": [],
+      "supporting": [{ "date": "2026-01-01" }],
+      "rules": {
+        "primaryLabel": "test data",
+        "staleDays": 1000000,
+        "minRecords": 4,
+        "qualityThreshold": 70,
+        "forbiddenActions": ["personalized_advice", "claim_realtime"]
+      },
+      "expected": {
+        "status": "missing",
+        "freshness": "unknown",
+        "allowedActions": {
+          "summarize": true,
+          "compare": false,
+          "personalized_advice": false,
+          "claim_realtime": false
+        },
+        "warnings": [{ "level": "block", "code": "primary_missing" }],
+        "caveats": ["No test data available — the AI must not invent numbers."],
+        "evidenceDigest": "fnv1a64:7255c3f76512adc2"
+      }
+    },
+    {
+      "name": "available-fresh",
+      "records": [
+        { "date": "2026-03-01", "qualityScore": 95 },
+        { "date": "2026-03-02", "qualityScore": 95 },
+        { "date": "2026-03-03", "qualityScore": 95 },
+        { "date": "2026-03-04", "qualityScore": 95 }
+      ],
+      "supporting": [],
+      "rules": {
+        "primaryLabel": "test data",
+        "staleDays": 1000000,
+        "minRecords": 4,
+        "qualityThreshold": 70,
+        "forbiddenActions": ["personalized_advice", "claim_realtime"]
+      },
+      "expected": {
+        "status": "available",
+        "freshness": "fresh",
+        "allowedActions": {
+          "summarize": true,
+          "compare": true,
+          "personalized_advice": false,
+          "claim_realtime": false
+        },
+        "warnings": [{ "level": "info", "code": "no_supporting" }],
+        "caveats": ["No supporting evidence — primary source only."]
+      }
+    },
+    {
+      "name": "quality-warning-few-records",
+      "records": [
+        { "date": "2026-03-01", "qualityScore": 95 },
+        { "date": "2026-03-02", "qualityScore": 95 }
+      ],
+      "supporting": [],
+      "rules": {
+        "primaryLabel": "test data",
+        "staleDays": 1000000,
+        "minRecords": 4,
+        "qualityThreshold": 70,
+        "forbiddenActions": []
+      },
+      "expected": {
+        "status": "quality_warning",
+        "freshness": "fresh",
+        "allowedActions": { "summarize": true, "compare": true },
+        "warnings": [
+          { "level": "review", "code": "primary_quality" },
+          { "level": "info", "code": "no_supporting" }
+        ]
+      }
+    },
+    {
+      "name": "quality-warning-low-score",
+      "records": [
+        { "date": "2026-03-01", "qualityScore": 95 },
+        { "date": "2026-03-02", "qualityScore": 95 },
+        { "date": "2026-03-03", "qualityScore": 95 },
+        { "date": "2026-03-04", "qualityScore": 40 }
+      ],
+      "supporting": [],
+      "rules": {
+        "primaryLabel": "test data",
+        "staleDays": 1000000,
+        "minRecords": 4,
+        "qualityThreshold": 70,
+        "forbiddenActions": []
+      },
+      "expected": {
+        "status": "quality_warning",
+        "freshness": "fresh",
+        "allowedActions": { "summarize": true, "compare": true },
+        "warnings": [
+          { "level": "review", "code": "primary_quality" },
+          { "level": "info", "code": "no_supporting" }
+        ]
+      }
+    },
+    {
+      "name": "quality-warning-flag",
+      "records": [
+        { "date": "2026-03-01" },
+        { "date": "2026-03-02" },
+        { "date": "2026-03-03" },
+        { "date": "2026-03-04", "flags": ["RESTATED"] }
+      ],
+      "supporting": [],
+      "rules": {
+        "primaryLabel": "test data",
+        "staleDays": 1000000,
+        "minRecords": 4,
+        "qualityThreshold": 70,
+        "forbiddenActions": []
+      },
+      "expected": {
+        "status": "quality_warning",
+        "freshness": "fresh",
+        "allowedActions": { "summarize": true, "compare": true },
+        "warnings": [
+          { "level": "review", "code": "primary_quality" },
+          { "level": "info", "code": "no_supporting" }
+        ],
+        "evidenceDigest": "fnv1a64:2338f53058e7e9af"
+      }
+    },
+    {
+      "name": "quality-warning-review",
+      "records": [{ "date": "2026-03-01", "quality": "review" }],
+      "supporting": [],
+      "rules": {
+        "primaryLabel": "test data",
+        "staleDays": 1000000,
+        "minRecords": 1,
+        "qualityThreshold": 70,
+        "forbiddenActions": []
+      },
+      "expected": {
+        "status": "quality_warning",
+        "freshness": "fresh",
+        "allowedActions": { "summarize": true, "compare": true },
+        "warnings": [
+          { "level": "review", "code": "primary_quality" },
+          { "level": "info", "code": "no_supporting" }
+        ],
+        "evidenceDigest": "fnv1a64:30cef2c8efbdb6cf"
+      }
+    },
+    {
+      "name": "fallback-all",
+      "records": [
+        { "date": "2026-01-01", "tier": "fallback" },
+        { "date": "2026-01-02", "tier": "fallback" }
+      ],
+      "supporting": [],
+      "rules": {
+        "primaryLabel": "test data",
+        "staleDays": 1000000,
+        "minRecords": 4,
+        "qualityThreshold": 70,
+        "forbiddenActions": []
+      },
+      "expected": {
+        "status": "fallback",
+        "freshness": "fresh",
+        "allowedActions": { "summarize": true, "compare": false },
+        "warnings": [
+          { "level": "review", "code": "primary_fallback" },
+          { "level": "info", "code": "no_supporting" }
+        ],
+        "evidenceDigest": "fnv1a64:feaa0771a8725a0b"
+      }
+    },
+    {
+      "name": "stale-available",
+      "records": [
+        { "date": "2000-01-01" },
+        { "date": "2000-01-02" },
+        { "date": "2000-01-03" },
+        { "date": "2000-01-04" }
+      ],
+      "supporting": [],
+      "rules": {
+        "primaryLabel": "test data",
+        "staleDays": 30,
+        "minRecords": 4,
+        "qualityThreshold": 70,
+        "forbiddenActions": []
+      },
+      "expected": {
+        "status": "available",
+        "freshness": "stale",
+        "allowedActions": { "summarize": true, "compare": true },
+        "warnings": [
+          { "level": "review", "code": "primary_stale" },
+          { "level": "info", "code": "no_supporting" }
+        ],
+        "caveats": [
+          "test data is stale (older than 30 days) — the AI must not say \"latest\" or \"today\".",
+          "No supporting evidence — primary source only."
+        ],
+        "evidenceDigest": "fnv1a64:e8133a78a3353a72"
+      }
+    },
+    {
+      "name": "unknown-freshness",
+      "records": [{ "date": "not-a-date" }],
+      "supporting": [],
+      "rules": {
+        "primaryLabel": "test data",
+        "staleDays": 30,
+        "minRecords": 1,
+        "qualityThreshold": 70,
+        "forbiddenActions": []
+      },
+      "expected": {
+        "status": "available",
+        "freshness": "unknown",
+        "allowedActions": { "summarize": true, "compare": true },
+        "warnings": [{ "level": "info", "code": "no_supporting" }],
+        "evidenceDigest": "fnv1a64:db03b9073634e960"
+      }
+    },
+    {
+      "name": "custom-message-override",
+      "records": [],
+      "supporting": [],
+      "rules": {
+        "staleDays": 30,
+        "minRecords": 1,
+        "qualityThreshold": 70,
+        "messages": { "primary_missing": "CUSTOM: nothing to see" }
+      },
+      "expected": {
+        "status": "missing",
+        "freshness": "unknown",
+        "allowedActions": { "summarize": false, "compare": false },
+        "warnings": [
+          { "level": "block", "code": "primary_missing" },
+          { "level": "info", "code": "no_supporting" }
+        ],
+        "caveats": [
+          "CUSTOM: nothing to see",
+          "No supporting evidence — primary source only."
+        ],
+        "evidenceDigest": "fnv1a64:b154377d61167670"
+      }
+    }
+  ],
+  "invalidRules": [
+    { "name": "rules-null", "rules": null, "errorField": null },
+    { "name": "rules-array", "rules": [], "errorField": null },
+    { "name": "empty-rules-object", "rules": {}, "errorField": "staleDays" },
+    {
+      "name": "missing-quality-threshold",
+      "rules": { "staleDays": 30, "minRecords": 1 },
+      "errorField": "qualityThreshold"
+    },
+    {
+      "name": "number-field-as-string",
+      "rules": { "staleDays": "30", "minRecords": 1, "qualityThreshold": 50 },
+      "errorField": "staleDays"
+    },
+    {
+      "name": "number-field-as-boolean",
+      "rules": { "staleDays": 30, "minRecords": true, "qualityThreshold": 50 },
+      "errorField": "minRecords"
+    },
+    {
+      "name": "forbidden-actions-not-a-list",
+      "rules": {
+        "staleDays": 30,
+        "minRecords": 1,
+        "qualityThreshold": 50,
+        "forbiddenActions": "personalized_advice"
+      },
+      "errorField": "forbiddenActions"
+    },
+    {
+      "name": "messages-not-an-object",
+      "rules": { "staleDays": 30, "minRecords": 1, "qualityThreshold": 50, "messages": [] },
+      "errorField": "messages"
+    },
+    {
+      "name": "primary-label-not-a-string",
+      "rules": { "staleDays": 30, "minRecords": 1, "qualityThreshold": 50, "primaryLabel": 42 },
+      "errorField": "primaryLabel"
+    }
+  ]
+}

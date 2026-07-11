@@ -18,7 +18,7 @@
     "LICENSE"
   ],
   "scripts": {
-    "test": "node test/core.test.mjs && node test/edge.test.mjs && node test/decision.test.mjs"
+    "test": "node test/core.test.mjs && node test/edge.test.mjs && node test/decision.test.mjs && node test/vectors.test.mjs"
   },
   "keywords": [
     "llm",
