@@ -2,10 +2,11 @@
 
 ## พร้อมทำ (เรียงตามลำดับ)
 
-1. **Fact cross-checking — รอเจ้าของ review/merge** — โค้ด+design+vectors เสร็จครบบน
-   branch `claude/fable-fact-check-c7yt0b` (design §8 = full spec แล้ว, เจ้าของเคาะ 4 trade-off
-   ในแชท 2026-07-11: strict ทุกตัวเลข / exact เท่านั้น / เลขไทยเต็มรูป / verdict ใหม่
-   `misquoted_values`) · ยังไม่ได้เปิด PR — เจ้าของสั่งเองถ้าต้องการ
+1. **Fact cross-checking — เปิด PR #16 แล้ว รอเจ้าของ review/merge** — โค้ด+design+vectors
+   เสร็จครบบน branch `claude/fable-fact-check-c7yt0b` (design §8 = full spec แล้ว, เจ้าของเคาะ
+   4 trade-off ในแชท 2026-07-11: strict ทุกตัวเลข / exact เท่านั้น / เลขไทยเต็มรูป / verdict ใหม่
+   `misquoted_values`) · **PR #16 https://github.com/LopezDray/evidence-gate/pull/16**
+   ยังไม่ได้ subscribe watch (เจ้าของยังไม่สั่ง) · merge main แล้ว = no-op (branch ตาม main อยู่)
 2. **P3-3 Release v1.0** — โค้ด+version+docs อยู่บน main แล้ว (PR #14 merged, `f681773`)
    · **ติดเจ้าของล้วน**: `release-checklist.md` ข้อ 8-11 = tag `v1.0.0` + `npm publish` + PyPI
    + GitHub Release (ใช้ `docs/release-notes-v1.0.md`) · เติม `docs/case-study-daddyinvestor.md`
@@ -27,5 +28,5 @@
   จะได้ fact cross-checking ฟรีด้วย (records รับ `facts` ได้เลย)
 - `evidenceGate` ยังไม่รับ `supporting` ผ่าน MCP `check_evidence` แบบมี tier ใน docs — เช็คตอนทำ verify_claims tool
 
-_อัปเดตล่าสุด: 2026-07-11 (ปิด session · fact cross-checking (design §8) implement ครบสองพอร์ต
-บน branch `claude/fable-fact-check-c7yt0b` รอเจ้าของ review · main ยังอยู่ที่ `09e4be1`)_
+_อัปเดตล่าสุด: 2026-07-11 (ปิด session · fact cross-checking (design §8) เสร็จครบสองพอร์ต ·
+เปิด PR #16 รอเจ้าของ review/merge · main ยังอยู่ที่ `09e4be1`)_
