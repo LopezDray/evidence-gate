@@ -59,7 +59,57 @@ export function validateRules(rules, caller = "evidenceGate") {
     throw new Error(`${caller}: rules.messages must be an object`);
   if (rules.primaryLabel != null && typeof rules.primaryLabel !== "string")
     throw new Error(`${caller}: rules.primaryLabel must be a string`);
+  if (rules.provenance != null) {
+    if (typeof rules.provenance !== "object" || Array.isArray(rules.provenance))
+      throw new Error(`${caller}: rules.provenance must be an object`);
+    const ma = rules.provenance.minAuthority;
+    if (ma != null && !AUTHORITY_LADDER.includes(ma))
+      throw new Error(`${caller}: rules.provenance.minAuthority must be one of ${AUTHORITY_LADDER.join("|")}`);
+  }
   return rules;
+}
+
+// ── Provenance ────────────────────────────────────────────────────────────────
+// Opt-in per record: record.provenance = { source: { id?, type?, authority? },
+// retrievedAt?, contentHash?, chain? }. The core never computes hashes — they
+// are opaque "<alg>:<hex>" strings the app supplies (see examples/provenance.mjs).
+
+export const AUTHORITY_LADDER = ["official", "licensed", "secondary", "unverified"];
+const AUTHORITY_RANK = { official: 3, licensed: 2, secondary: 1, unverified: 0 };
+
+const isPlainObject = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
+const isHash = (v) => typeof v === "string" && v.length > 0;
+
+// Chain continuity (§3 of the design doc): chain[0].inputHash must equal
+// contentHash, and every chain[i].inputHash must equal chain[i-1].outputHash.
+// Hashes are compared as opaque strings. Never throws, never changes gate
+// status by itself — broken continuity surfaces as a gate warning.
+export function validateProvenance(record) {
+  const problems = [];
+  const p = record == null ? null : record.provenance;
+  if (p == null) return { valid: true, problems }; // no provenance = nothing to validate
+  if (!isPlainObject(p)) return { valid: false, problems: ["invalid_provenance"] };
+  if (!isPlainObject(p.source)) problems.push("missing_source");
+  if (p.chain != null && !Array.isArray(p.chain)) problems.push("invalid_chain");
+  const chain = Array.isArray(p.chain) ? p.chain : [];
+  if (chain.length) {
+    const first = isPlainObject(chain[0]) ? chain[0] : {};
+    if (!isHash(p.contentHash) || first.inputHash !== p.contentHash) problems.push("chain_root_mismatch");
+    for (let i = 1; i < chain.length; i++) {
+      const prev = isPlainObject(chain[i - 1]) ? chain[i - 1] : {};
+      const cur = isPlainObject(chain[i]) ? chain[i] : {};
+      if (!isHash(prev.outputHash) || cur.inputHash !== prev.outputHash) problems.push(`chain_gap_at_${i}`);
+    }
+  }
+  return { valid: problems.length === 0, problems };
+}
+
+// rank of a record's source authority; unknown/missing ranks below the ladder
+function authorityRank(record) {
+  const p = record == null ? null : record.provenance;
+  const src = isPlainObject(p) && isPlainObject(p.source) ? p.source : null;
+  const rank = src ? AUTHORITY_RANK[src.authority] : undefined;
+  return rank === undefined ? -1 : rank;
 }
 
 // ── classifyStatus: records[] + rules → status of the primary evidence group ──
@@ -180,8 +230,50 @@ export function evidenceGate({ records = [], supporting = [], rules, decision } 
     warnings.push({ level: "review", code: "primary_quality", message: M.primary_quality || `${label} has a data-quality warning — the AI must add a caveat.` });
   if (primary.freshness === "stale")
     warnings.push({ level: "review", code: "primary_stale", message: M.primary_stale || `${label} is stale (older than ${rules.staleDays} days) — the AI must not say "latest" or "today".` });
+
+  // Provenance (opt-in via rules.provenance; deliberate v1 scope cut: these
+  // warnings NEVER change status or allowedActions — they only add caveats).
+  const provRecords = records.filter((r) => r != null && r.provenance != null);
+  const brokenChains = provRecords.filter((r) => !validateProvenance(r).valid).length;
+  const P = rules.provenance;
+  if (P) {
+    const missing = records.length - provRecords.length;
+    if (P.require && missing > 0)
+      warnings.push({ level: "review", code: "provenance_missing", message: M.provenance_missing || `${missing} of ${records.length} record(s) lack provenance — the AI must not present them as verified sources.` });
+    if (P.minAuthority != null) {
+      // per-record comparison: one weak source taints the set with a caveat
+      const untrusted = provRecords.filter((r) => authorityRank(r) < AUTHORITY_RANK[P.minAuthority]).length;
+      if (untrusted > 0)
+        warnings.push({ level: "review", code: "provenance_untrusted", message: M.provenance_untrusted || `${untrusted} record(s) come from sources below "${P.minAuthority}" authority — the AI must attribute them cautiously.` });
+    }
+    if (brokenChains > 0)
+      warnings.push({ level: "review", code: "provenance_broken_chain", message: M.provenance_broken_chain || `${brokenChains} record(s) have a broken provenance chain — their lineage is not replay-verifiable.` });
+  }
+
   if (!supportingPresent)
     warnings.push({ level: "info", code: "no_supporting", message: M.no_supporting || "No supporting evidence — primary source only." });
+
+  // Source-naming attribution (info, opt-in via rules.provenance): only when
+  // every provenance-bearing record names its source, and there are at most
+  // two distinct sources — silent beyond that (counts still land in
+  // decision.provenance.sources).
+  if (P && provRecords.length > 0) {
+    const ids = provRecords.map((r) => (isPlainObject(r.provenance.source) ? r.provenance.source.id : undefined));
+    if (ids.every((id) => typeof id === "string" && id !== "")) {
+      const distinct = [...new Set(ids)];
+      const authOf = (id) => {
+        const src = provRecords.find((r) => r.provenance.source.id === id).provenance.source;
+        return typeof src.authority === "string" ? src.authority : "unknown";
+      };
+      if (distinct.length === 1) {
+        const retrieved = provRecords.map((r) => r.provenance.retrievedAt).filter((v) => typeof v === "string" && v !== "");
+        const suffix = retrieved.length ? `, retrieved ${retrieved.reduce((a, b) => (a > b ? a : b)).slice(0, 10)}` : "";
+        warnings.push({ level: "info", code: "provenance_attribution", message: M.provenance_attribution || `${label} are based on ${distinct[0]} (${authOf(distinct[0])})${suffix}.` });
+      } else if (distinct.length === 2) {
+        warnings.push({ level: "info", code: "provenance_attribution", message: M.provenance_attribution || `${label} are based on ${distinct[0]} (${authOf(distinct[0])}) and ${distinct[1]} (${authOf(distinct[1])}).` });
+      }
+    }
+  }
 
   const result = { status: primary.status, freshness: primary.freshness, allowedActions, warnings, caveats: warnings.map((w) => w.message) };
 
@@ -208,6 +300,30 @@ export function evidenceGate({ records = [], supporting = [], rules, decision } 
         caveats: result.caveats,
       },
     };
+    // Additive block (still evidence-gate.decision/1 — consumers must ignore
+    // unknown fields): present whenever any record carries provenance,
+    // independent of rules.provenance. Source ids DO appear (auditors need
+    // them); no evidence values, no content excerpts.
+    if (provRecords.length > 0) {
+      const sources = [];
+      const byKey = new Map();
+      for (const r of provRecords) {
+        const src = isPlainObject(r.provenance.source) ? r.provenance.source : {};
+        const entry = { id: src.id ?? null, type: src.type ?? null, authority: src.authority ?? null };
+        const key = canonicalJson([entry.id, entry.type, entry.authority]);
+        if (byKey.has(key)) byKey.get(key).records += 1;
+        else { const e = { ...entry, records: 1 }; byKey.set(key, e); sources.push(e); }
+      }
+      result.decision.provenance = {
+        covered: provRecords.length,
+        total: records.length,
+        sources,
+        brokenChains,
+        // replay-verifiable exactly like the evidence digest: recompute over
+        // the claimed provenance set (in record order), compare with the log
+        digest: evidenceDigest(provRecords.map((r) => r.provenance)),
+      };
+    }
   }
 
   return result;

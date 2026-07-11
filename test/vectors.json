@@ -311,6 +311,257 @@
       }
     },
     {
+      "name": "provenance-attribution-single-source",
+      "records": [
+        { "date": "2026-03-01", "provenance": { "source": { "id": "sec-edgar", "type": "filing", "authority": "official" } } },
+        { "date": "2026-03-02", "provenance": { "source": { "id": "sec-edgar", "type": "filing", "authority": "official" } } }
+      ],
+      "supporting": [],
+      "rules": {
+        "primaryLabel": "test data",
+        "staleDays": 1000000,
+        "minRecords": 1,
+        "qualityThreshold": 70,
+        "forbiddenActions": [],
+        "provenance": {}
+      },
+      "expected": {
+        "status": "available",
+        "freshness": "fresh",
+        "allowedActions": { "summarize": true, "compare": true },
+        "warnings": [
+          { "level": "info", "code": "no_supporting" },
+          { "level": "info", "code": "provenance_attribution" }
+        ],
+        "caveats": [
+          "No supporting evidence — primary source only.",
+          "test data are based on sec-edgar (official)."
+        ],
+        "provenance": {
+          "covered": 2,
+          "total": 2,
+          "sources": [{ "id": "sec-edgar", "type": "filing", "authority": "official", "records": 2 }],
+          "brokenChains": 0,
+          "digest": "fnv1a64:c177c928b6db10e9"
+        }
+      }
+    },
+    {
+      "name": "provenance-attribution-two-sources",
+      "records": [
+        { "date": "2026-03-01", "provenance": { "source": { "id": "sec-edgar", "type": "filing", "authority": "official" } } },
+        { "date": "2026-03-02", "provenance": { "source": { "id": "help-center", "type": "document", "authority": "secondary" } } }
+      ],
+      "supporting": [],
+      "rules": {
+        "primaryLabel": "test data",
+        "staleDays": 1000000,
+        "minRecords": 1,
+        "qualityThreshold": 70,
+        "forbiddenActions": [],
+        "provenance": {}
+      },
+      "expected": {
+        "status": "available",
+        "freshness": "fresh",
+        "allowedActions": { "summarize": true, "compare": true },
+        "warnings": [
+          { "level": "info", "code": "no_supporting" },
+          { "level": "info", "code": "provenance_attribution" }
+        ],
+        "caveats": [
+          "No supporting evidence — primary source only.",
+          "test data are based on sec-edgar (official) and help-center (secondary)."
+        ],
+        "provenance": {
+          "covered": 2,
+          "total": 2,
+          "sources": [
+            { "id": "sec-edgar", "type": "filing", "authority": "official", "records": 1 },
+            { "id": "help-center", "type": "document", "authority": "secondary", "records": 1 }
+          ],
+          "brokenChains": 0,
+          "digest": "fnv1a64:218152cd76191b96"
+        }
+      }
+    },
+    {
+      "name": "provenance-attribution-silent-three-sources",
+      "records": [
+        { "date": "2026-03-01", "provenance": { "source": { "id": "sec-edgar", "type": "filing", "authority": "official" } } },
+        { "date": "2026-03-02", "provenance": { "source": { "id": "help-center", "type": "document", "authority": "secondary" } } },
+        { "date": "2026-03-03", "provenance": { "source": { "id": "vendor-x", "type": "api", "authority": "licensed" } } }
+      ],
+      "supporting": [],
+      "rules": {
+        "primaryLabel": "test data",
+        "staleDays": 1000000,
+        "minRecords": 1,
+        "qualityThreshold": 70,
+        "forbiddenActions": [],
+        "provenance": {}
+      },
+      "expected": {
+        "status": "available",
+        "freshness": "fresh",
+        "allowedActions": { "summarize": true, "compare": true },
+        "warnings": [{ "level": "info", "code": "no_supporting" }],
+        "provenance": {
+          "covered": 3,
+          "total": 3,
+          "sources": [
+            { "id": "sec-edgar", "type": "filing", "authority": "official", "records": 1 },
+            { "id": "help-center", "type": "document", "authority": "secondary", "records": 1 },
+            { "id": "vendor-x", "type": "api", "authority": "licensed", "records": 1 }
+          ],
+          "brokenChains": 0,
+          "digest": "fnv1a64:3f17c3d9e1c74af3"
+        }
+      }
+    },
+    {
+      "name": "provenance-require-missing",
+      "records": [
+        { "date": "2026-03-01", "provenance": { "source": { "id": "sec-edgar", "type": "filing", "authority": "official" } } },
+        { "date": "2026-03-02" }
+      ],
+      "supporting": [],
+      "rules": {
+        "primaryLabel": "test data",
+        "staleDays": 1000000,
+        "minRecords": 1,
+        "qualityThreshold": 70,
+        "forbiddenActions": [],
+        "provenance": { "require": true }
+      },
+      "expected": {
+        "status": "available",
+        "freshness": "fresh",
+        "allowedActions": { "summarize": true, "compare": true },
+        "warnings": [
+          { "level": "review", "code": "provenance_missing" },
+          { "level": "info", "code": "no_supporting" },
+          { "level": "info", "code": "provenance_attribution" }
+        ],
+        "caveats": [
+          "1 of 2 record(s) lack provenance — the AI must not present them as verified sources.",
+          "No supporting evidence — primary source only.",
+          "test data are based on sec-edgar (official)."
+        ],
+        "provenance": {
+          "covered": 1,
+          "total": 2,
+          "sources": [{ "id": "sec-edgar", "type": "filing", "authority": "official", "records": 1 }],
+          "brokenChains": 0,
+          "digest": "fnv1a64:7f6b29a31769ff9b"
+        }
+      }
+    },
+    {
+      "name": "provenance-min-authority-untrusted",
+      "records": [
+        { "date": "2026-03-01", "provenance": { "source": { "id": "sec-edgar", "type": "filing", "authority": "official" } } },
+        { "date": "2026-03-02", "provenance": { "source": { "id": "help-center", "type": "document", "authority": "secondary" } } }
+      ],
+      "supporting": [],
+      "rules": {
+        "primaryLabel": "test data",
+        "staleDays": 1000000,
+        "minRecords": 1,
+        "qualityThreshold": 70,
+        "forbiddenActions": [],
+        "provenance": { "minAuthority": "official" }
+      },
+      "expected": {
+        "status": "available",
+        "freshness": "fresh",
+        "allowedActions": { "summarize": true, "compare": true },
+        "warnings": [
+          { "level": "review", "code": "provenance_untrusted" },
+          { "level": "info", "code": "no_supporting" },
+          { "level": "info", "code": "provenance_attribution" }
+        ],
+        "caveats": [
+          "1 record(s) come from sources below \"official\" authority — the AI must attribute them cautiously.",
+          "No supporting evidence — primary source only.",
+          "test data are based on sec-edgar (official) and help-center (secondary)."
+        ]
+      }
+    },
+    {
+      "name": "provenance-broken-chain",
+      "records": [
+        {
+          "date": "2026-03-01",
+          "provenance": {
+            "source": { "id": "sec-edgar", "type": "filing", "authority": "official" },
+            "contentHash": "sha256:aaaa",
+            "chain": [
+              { "step": "parse", "tool": "p@1", "inputHash": "sha256:aaaa", "outputHash": "sha256:bbbb" },
+              { "step": "normalize", "tool": "n@1", "inputHash": "sha256:XXXX", "outputHash": "sha256:cccc" }
+            ]
+          }
+        }
+      ],
+      "supporting": [],
+      "rules": {
+        "primaryLabel": "test data",
+        "staleDays": 1000000,
+        "minRecords": 1,
+        "qualityThreshold": 70,
+        "forbiddenActions": [],
+        "provenance": {}
+      },
+      "expected": {
+        "status": "available",
+        "freshness": "fresh",
+        "allowedActions": { "summarize": true, "compare": true },
+        "warnings": [
+          { "level": "review", "code": "provenance_broken_chain" },
+          { "level": "info", "code": "no_supporting" },
+          { "level": "info", "code": "provenance_attribution" }
+        ],
+        "caveats": [
+          "1 record(s) have a broken provenance chain — their lineage is not replay-verifiable.",
+          "No supporting evidence — primary source only.",
+          "test data are based on sec-edgar (official)."
+        ],
+        "provenance": {
+          "covered": 1,
+          "total": 1,
+          "sources": [{ "id": "sec-edgar", "type": "filing", "authority": "official", "records": 1 }],
+          "brokenChains": 1
+        }
+      }
+    },
+    {
+      "name": "provenance-silent-without-rules",
+      "records": [
+        { "date": "2026-03-01", "provenance": { "source": { "id": "help-center", "type": "document", "authority": "secondary" } } }
+      ],
+      "supporting": [],
+      "rules": {
+        "primaryLabel": "test data",
+        "staleDays": 1000000,
+        "minRecords": 1,
+        "qualityThreshold": 70,
+        "forbiddenActions": []
+      },
+      "expected": {
+        "status": "available",
+        "freshness": "fresh",
+        "allowedActions": { "summarize": true, "compare": true },
+        "warnings": [{ "level": "info", "code": "no_supporting" }],
+        "provenance": {
+          "covered": 1,
+          "total": 1,
+          "sources": [{ "id": "help-center", "type": "document", "authority": "secondary", "records": 1 }],
+          "brokenChains": 0,
+          "digest": "fnv1a64:e91368014a68529c"
+        }
+      }
+    },
+    {
       "name": "custom-message-override",
       "records": [],
       "supporting": [],
@@ -334,6 +585,74 @@
         ],
         "evidenceDigest": "fnv1a64:b154377d61167670"
       }
+    }
+  ],
+  "validateProvenance": [
+    { "name": "no-provenance", "record": { "date": "2026-01-01" }, "expected": { "valid": true, "problems": [] } },
+    {
+      "name": "minimal-valid",
+      "record": { "provenance": { "source": { "id": "sec-edgar", "type": "filing", "authority": "official" } } },
+      "expected": { "valid": true, "problems": [] }
+    },
+    {
+      "name": "missing-source",
+      "record": { "provenance": { "retrievedAt": "2026-06-30T08:12:00Z" } },
+      "expected": { "valid": false, "problems": ["missing_source"] }
+    },
+    {
+      "name": "good-chain",
+      "record": {
+        "provenance": {
+          "source": { "id": "s" },
+          "contentHash": "sha256:aa",
+          "chain": [
+            { "step": "a", "inputHash": "sha256:aa", "outputHash": "sha256:bb" },
+            { "step": "b", "inputHash": "sha256:bb", "outputHash": "sha256:cc" }
+          ]
+        }
+      },
+      "expected": { "valid": true, "problems": [] }
+    },
+    {
+      "name": "root-mismatch",
+      "record": {
+        "provenance": {
+          "source": { "id": "s" },
+          "contentHash": "sha256:aa",
+          "chain": [{ "step": "a", "inputHash": "sha256:ZZ", "outputHash": "sha256:bb" }]
+        }
+      },
+      "expected": { "valid": false, "problems": ["chain_root_mismatch"] }
+    },
+    {
+      "name": "chain-without-content-hash",
+      "record": {
+        "provenance": {
+          "source": { "id": "s" },
+          "chain": [{ "step": "a", "inputHash": "sha256:aa", "outputHash": "sha256:bb" }]
+        }
+      },
+      "expected": { "valid": false, "problems": ["chain_root_mismatch"] }
+    },
+    {
+      "name": "gap-at-1-and-2",
+      "record": {
+        "provenance": {
+          "source": { "id": "s" },
+          "contentHash": "sha256:aa",
+          "chain": [
+            { "step": "a", "inputHash": "sha256:aa", "outputHash": "sha256:bb" },
+            { "step": "b", "inputHash": "sha256:XX", "outputHash": "sha256:cc" },
+            { "step": "c", "inputHash": "sha256:YY", "outputHash": "sha256:dd" }
+          ]
+        }
+      },
+      "expected": { "valid": false, "problems": ["chain_gap_at_1", "chain_gap_at_2"] }
+    },
+    {
+      "name": "invalid-provenance",
+      "record": { "provenance": "not-an-object" },
+      "expected": { "valid": false, "problems": ["invalid_provenance"] }
     }
   ],
   "citationBlock": [
@@ -640,6 +959,16 @@
       "name": "primary-label-not-a-string",
       "rules": { "staleDays": 30, "minRecords": 1, "qualityThreshold": 50, "primaryLabel": 42 },
       "errorField": "primaryLabel"
+    },
+    {
+      "name": "provenance-not-an-object",
+      "rules": { "staleDays": 30, "minRecords": 1, "qualityThreshold": 50, "provenance": "strict" },
+      "errorField": "provenance"
+    },
+    {
+      "name": "min-authority-not-in-ladder",
+      "rules": { "staleDays": 30, "minRecords": 1, "qualityThreshold": 50, "provenance": { "minAuthority": "gospel" } },
+      "errorField": "provenance.minAuthority"
     }
   ]
 }

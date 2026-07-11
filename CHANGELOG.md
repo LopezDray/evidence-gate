@@ -6,6 +6,19 @@ to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **Evidence provenance** (P3-1) — records can opt in to a `provenance`
+  block (`source` id/type/authority, `retrievedAt`, `contentHash`, hash-linked
+  transform `chain`). `validateProvenance` / `validate_provenance` checks
+  chain continuity by construction (never throws, never changes status).
+  Opt-in `rules.provenance` (`require`, `minAuthority`) adds
+  `provenance_missing` / `provenance_untrusted` / `provenance_broken_chain`
+  caveats plus a source-naming `provenance_attribution` caveat — by design
+  these never change `status` or `allowedActions` in v1. Decision records
+  gain an additive `decision.provenance` block (coverage, per-source tallies,
+  broken chains, replay-verifiable digest) — schema stays
+  `evidence-gate.decision/1`; adding optional fields never bumps the version.
+  The core never computes hashes — see `examples/provenance.mjs`
+  (`node:crypto` / `hashlib`).
 - **Post-generation claim verification** (P3-2) — `verifyClaims` /
   `verify_claims` closes the proof loop: every citation in the answer must
   resolve to a real evidence record (no phantom evidence), every

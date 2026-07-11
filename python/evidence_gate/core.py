@@ -65,6 +65,58 @@ def freshness_label(latest, threshold_days):
     return "stale" if age > threshold_days else "fresh"
 
 
+# ── Provenance ────────────────────────────────────────────────────────────────
+# Opt-in per record: record["provenance"] = {"source": {"id"?, "type"?,
+# "authority"?}, "retrieved_at"?, "content_hash"?, "chain"?}. The core never
+# computes hashes — they are opaque "<alg>:<hex>" strings the app supplies.
+
+AUTHORITY_LADDER = ["official", "licensed", "secondary", "unverified"]
+_AUTHORITY_RANK = {"official": 3, "licensed": 2, "secondary": 1, "unverified": 0}
+
+
+def _is_hash(v):
+    return isinstance(v, str) and len(v) > 0
+
+
+def validate_provenance(record):
+    """Chain continuity (design doc §3): chain[0].input_hash must equal
+    content_hash, and every chain[i].input_hash must equal
+    chain[i-1].output_hash. Hashes are compared as opaque strings. Never
+    raises, never changes gate status by itself — broken continuity surfaces
+    as a gate warning."""
+    problems = []
+    p = record.get("provenance") if isinstance(record, dict) else None
+    if p is None:
+        return {"valid": True, "problems": problems}  # no provenance = nothing to validate
+    if not isinstance(p, dict):
+        return {"valid": False, "problems": ["invalid_provenance"]}
+    if not isinstance(p.get("source"), dict):
+        problems.append("missing_source")
+    raw_chain = p.get("chain")
+    if raw_chain is not None and not isinstance(raw_chain, list):
+        problems.append("invalid_chain")
+    chain = raw_chain if isinstance(raw_chain, list) else []
+    if chain:
+        first = chain[0] if isinstance(chain[0], dict) else {}
+        if not _is_hash(p.get("content_hash")) or first.get("input_hash") != p.get("content_hash"):
+            problems.append("chain_root_mismatch")
+        for i in range(1, len(chain)):
+            prev = chain[i - 1] if isinstance(chain[i - 1], dict) else {}
+            cur = chain[i] if isinstance(chain[i], dict) else {}
+            if not _is_hash(prev.get("output_hash")) or cur.get("input_hash") != prev.get("output_hash"):
+                problems.append(f"chain_gap_at_{i}")
+    return {"valid": not problems, "problems": problems}
+
+
+def _authority_rank(record):
+    """Rank of a record's source authority; unknown/missing ranks below the ladder."""
+    p = record.get("provenance") if isinstance(record, dict) else None
+    src = p.get("source") if isinstance(p, dict) else None
+    if not isinstance(src, dict):
+        return -1
+    return _AUTHORITY_RANK.get(src.get("authority"), -1)
+
+
 # ── validate_rules: fail fast on malformed rulesets ──────────────────────────
 # Both ports validate rules at call time and throw the same way, so a bad
 # ruleset can never silently pass one port (JS used to treat missing numeric
@@ -91,6 +143,13 @@ def validate_rules(rules, caller="evidence_gate"):
     label = rules.get("primary_label")
     if label is not None and not isinstance(label, str):
         raise ValueError(f'{caller}: rules["primary_label"] must be a string')
+    prov = rules.get("provenance")
+    if prov is not None:
+        if not isinstance(prov, dict):
+            raise ValueError(f'{caller}: rules["provenance"] must be a dict')
+        ma = prov.get("min_authority")
+        if ma is not None and ma not in AUTHORITY_LADDER:
+            raise ValueError(f'{caller}: rules["provenance"]["min_authority"] must be one of {"|".join(AUTHORITY_LADDER)}')
     return rules
 
 
@@ -183,9 +242,65 @@ def evidence_gate(records=None, supporting=None, rules=None, decision=None):
     if primary["freshness"] == "stale":
         warnings.append({"level": "review", "code": "primary_stale",
                          "message": m.get("primary_stale", f'{label} is stale (older than {rules["stale_days"]} days) — the AI must not say "latest" or "today".')})
+
+    # Provenance (opt-in via rules["provenance"]; deliberate v1 scope cut:
+    # these warnings NEVER change status or allowed_actions — only caveats).
+    all_records = records or []
+    prov_records = [r for r in all_records if isinstance(r, dict) and r.get("provenance") is not None]
+    broken_chains = sum(1 for r in prov_records if not validate_provenance(r)["valid"])
+    prov_rules = rules.get("provenance")
+    # `{}` is falsy in Python but truthy in JS — an empty rules.provenance
+    # still opts in (enables chain checks + attribution), so test identity
+    if prov_rules is not None:
+        missing = len(all_records) - len(prov_records)
+        if prov_rules.get("require") and missing > 0:
+            warnings.append({"level": "review", "code": "provenance_missing",
+                             "message": m.get("provenance_missing", f"{missing} of {len(all_records)} record(s) lack provenance — the AI must not present them as verified sources.")})
+        min_authority = prov_rules.get("min_authority")
+        if min_authority is not None:
+            # per-record comparison: one weak source taints the set with a caveat
+            untrusted = sum(1 for r in prov_records if _authority_rank(r) < _AUTHORITY_RANK[min_authority])
+            if untrusted > 0:
+                warnings.append({"level": "review", "code": "provenance_untrusted",
+                                 "message": m.get("provenance_untrusted", f'{untrusted} record(s) come from sources below "{min_authority}" authority — the AI must attribute them cautiously.')})
+        if broken_chains > 0:
+            warnings.append({"level": "review", "code": "provenance_broken_chain",
+                             "message": m.get("provenance_broken_chain", f"{broken_chains} record(s) have a broken provenance chain — their lineage is not replay-verifiable.")})
+
     if not supporting_present:
         warnings.append({"level": "info", "code": "no_supporting",
                          "message": m.get("no_supporting", "No supporting evidence — primary source only.")})
+
+    # Source-naming attribution (info, opt-in via rules["provenance"]): only
+    # when every provenance-bearing record names its source, and there are at
+    # most two distinct sources — silent beyond that (counts still land in
+    # decision["provenance"]["sources"]).
+    if prov_rules is not None and prov_records:
+        def _source_of(r):
+            p = r.get("provenance")
+            s = p.get("source") if isinstance(p, dict) else None
+            return s if isinstance(s, dict) else {}
+
+        ids = [_source_of(r).get("id") for r in prov_records]
+        if all(isinstance(i, str) and i != "" for i in ids):
+            distinct = list(dict.fromkeys(ids))
+
+            def auth_of(source_id):
+                for r in prov_records:
+                    if r["provenance"]["source"].get("id") == source_id:
+                        a = r["provenance"]["source"].get("authority")
+                        return a if isinstance(a, str) else "unknown"
+                return "unknown"
+
+            if len(distinct) == 1:
+                retrieved = [r["provenance"].get("retrieved_at") for r in prov_records
+                             if isinstance(r["provenance"].get("retrieved_at"), str) and r["provenance"].get("retrieved_at")]
+                suffix = f", retrieved {max(retrieved)[:10]}" if retrieved else ""
+                warnings.append({"level": "info", "code": "provenance_attribution",
+                                 "message": m.get("provenance_attribution", f"{label} are based on {distinct[0]} ({auth_of(distinct[0])}){suffix}.")})
+            elif len(distinct) == 2:
+                warnings.append({"level": "info", "code": "provenance_attribution",
+                                 "message": m.get("provenance_attribution", f"{label} are based on {distinct[0]} ({auth_of(distinct[0])}) and {distinct[1]} ({auth_of(distinct[1])}).")})
 
     result = {"status": st, "freshness": primary["freshness"], "allowed_actions": allowed,
               "warnings": warnings, "caveats": [w["message"] for w in warnings]}
@@ -218,5 +333,33 @@ def evidence_gate(records=None, supporting=None, rules=None, decision=None):
                 "caveats": result["caveats"],
             },
         }
+        # Additive block (still evidence-gate.decision/1 — consumers must
+        # ignore unknown fields): present whenever any record carries
+        # provenance, independent of rules["provenance"]. Source ids DO appear
+        # (auditors need them); no evidence values, no content excerpts.
+        if prov_records:
+            sources = []
+            by_key = {}
+            for r in prov_records:
+                p = r.get("provenance")
+                src = p.get("source") if isinstance(p, dict) else None
+                src = src if isinstance(src, dict) else {}
+                entry = {"id": src.get("id"), "type": src.get("type"), "authority": src.get("authority")}
+                key = canonical_json([entry["id"], entry["type"], entry["authority"]])
+                if key in by_key:
+                    by_key[key]["records"] += 1
+                else:
+                    e = dict(entry, records=1)
+                    by_key[key] = e
+                    sources.append(e)
+            result["decision"]["provenance"] = {
+                "covered": len(prov_records),
+                "total": len(all_records),
+                "sources": sources,
+                "broken_chains": broken_chains,
+                # replay-verifiable exactly like the evidence digest: recompute
+                # over the claimed provenance set (in record order), compare
+                "digest": evidence_digest([r["provenance"] for r in prov_records]),
+            }
 
     return result

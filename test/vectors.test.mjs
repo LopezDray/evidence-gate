@@ -7,7 +7,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { evidenceGate, canonicalJson, fnv1a64, evidenceDigest } from "../src/core.js";
+import { evidenceGate, canonicalJson, fnv1a64, evidenceDigest, validateProvenance } from "../src/core.js";
 import { verifyClaims, citationBlock } from "../src/verify.js";
 
 const vectors = JSON.parse(readFileSync(join(dirname(fileURLToPath(import.meta.url)), "vectors.json"), "utf8"));
@@ -48,6 +48,21 @@ for (const c of vectors.gate) {
   if (e.evidenceDigest)
     ok(`gate ${c.name}: evidence digest (cross-port)`,
       g.decision.digests.evidence === e.evidenceDigest, g.decision.digests.evidence);
+  if (e.provenance) {
+    const p = g.decision.provenance || {};
+    ok(`gate ${c.name}: decision.provenance coverage`,
+      p.covered === e.provenance.covered && p.total === e.provenance.total && p.brokenChains === e.provenance.brokenChains,
+      JSON.stringify(p));
+    ok(`gate ${c.name}: decision.provenance sources`, eq(p.sources, e.provenance.sources), JSON.stringify(p.sources));
+    if (e.provenance.digest)
+      ok(`gate ${c.name}: provenance digest (cross-port)`, p.digest === e.provenance.digest, p.digest);
+  }
+}
+
+// ── validateProvenance: chain continuity ──────────────────────────────────────
+for (const c of vectors.validateProvenance) {
+  const got = validateProvenance(c.record);
+  ok(`validateProvenance ${c.name}`, eq(got, c.expected), JSON.stringify(got));
 }
 
 // ── citationBlock: exact prompt-block strings ─────────────────────────────────

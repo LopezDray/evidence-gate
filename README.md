@@ -119,6 +119,44 @@ Digests are FNV-1a 64 over canonical JSON — deterministic and identical across
 the JS and Python ports (not cryptographic; they detect drift, not adversaries).
 See `examples/decision-log.mjs` for the full flow.
 
+## Provenance — prove where the evidence came from
+
+Each record can opt in to a `provenance` block answering the three questions
+an auditor asks: where did this come from, what happened to it on the way
+here, and is it the same bytes it claims to be?
+
+```js
+{ date: "2026-03-31", qualityScore: 92,
+  provenance: {
+    source: { id: "sec-edgar", type: "filing", authority: "official" }, // authority: official > licensed > secondary > unverified
+    retrievedAt: "2026-06-30T08:12:00Z",
+    contentHash: "sha256:ab12…",       // hash of the RAW artifact — YOUR app computes it (node:crypto / hashlib)
+    chain: [                           // transform lineage, hash-linked
+      { step: "parse-xbrl", tool: "edgar-parser@2.1", inputHash: "sha256:ab12…", outputHash: "sha256:cd34…" },
+    ] } }
+```
+
+The core never computes hashes — they're opaque strings, and the chain is
+verifiable by construction: `validateProvenance(record)` checks that
+`chain[0].inputHash` equals `contentHash` and every link's input matches the
+previous link's output. Broken continuity never throws and never changes gate
+status — garbage in, caveat out.
+
+Gate integration is opt-in via `rules.provenance`:
+
+```js
+rules.provenance = { require: true, minAuthority: "licensed" };
+// → provenance_missing / provenance_untrusted / provenance_broken_chain caveats,
+//   plus a provenance_attribution caveat naming the source(s):
+//   "financial statements are based on sec-edgar (official), retrieved 2026-06-30."
+```
+
+Provenance warnings **never change `status` or `allowedActions`** in v1 —
+they only add caveats. When a decision record is requested and any record
+carries provenance, the record gains an additive `decision.provenance` block
+(coverage counts, per-source tallies, broken-chain count, and a
+replay-verifiable digest of the provenance set). See `examples/provenance.mjs`.
+
 ## The proof loop — verify the answer, not just the evidence
 
 The gate decides *whether* the model may speak. `verifyClaims` closes the
