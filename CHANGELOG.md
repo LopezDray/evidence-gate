@@ -5,7 +5,29 @@ to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.0.0] — 2026-07-11
+
+First stable release. The proof loop is complete: the gate decides whether the
+model may speak, `verifyClaims` checks that what it said stands on the evidence,
+and provenance records where that evidence came from — all deterministic and
+byte-identical across the JS and Python ports, locked by a shared vector file.
+
+### Changed
+- **BREAKING: rulesets are validated at call time.** `staleDays`, `minRecords`,
+  and `qualityThreshold` are now required finite numbers. A ruleset missing one
+  throws instead of silently behaving as permissive (the old JS behavior) or
+  raising an opaque `KeyError` (the old Python behavior). If you pass a
+  hand-built ruleset rather than a preset, ensure these three fields are set.
+
 ### Added
+- **Tamper-evident decision log** — `chainDecision` / `chain_decision` links
+  each decision record to the previous one by digest (`prev` field);
+  `verifyDecisionChain` / `verify_decision_chain` replays a log and reports the
+  first broken link. Editing any past JSONL line invalidates every record after
+  it. `prev` is additive (schema stays `evidence-gate.decision/1`); zero
+  dependency, byte-identical across ports. Not cryptographic — detects
+  after-the-fact edits, not a full-tail rewrite. See
+  `examples/tamper-evident-log.mjs`.
 - **Evidence provenance** (P3-1) — records can opt in to a `provenance`
   block (`source` id/type/authority, `retrievedAt`, `contentHash`, hash-linked
   transform `chain`). `validateProvenance` / `validate_provenance` checks
@@ -51,12 +73,6 @@ to [Semantic Versioning](https://semver.org/).
   the library API. Invalid inline rulesets come back as a readable tool error
   (`isError: true`) instead of a protocol failure.
 
-### Fixed
-- Closed a port divergence: the JS gate silently treated a ruleset with
-  missing numeric fields as permissive (everything looked fresh), while
-  Python raised a bare `KeyError`. Both ports now reject incomplete rules
-  identically — even when `records` is empty.
-
 ## [0.2.0] — 2026-07-10
 
 ### Added
@@ -86,5 +102,6 @@ to [Semantic Versioning](https://semver.org/).
   presets, and an MCP server exposing a `check_evidence` tool. JS and Python
   ports, zero runtime dependencies.
 
+[1.0.0]: https://github.com/LopezDray/evidence-gate/releases/tag/v1.0.0
 [0.2.0]: https://github.com/LopezDray/evidence-gate/releases/tag/v0.2.0
 [0.1.0]: https://github.com/LopezDray/evidence-gate/releases/tag/v0.1.0

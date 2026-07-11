@@ -1,5 +1,10 @@
 # Evidence Gate
 
+[![test](https://github.com/LopezDray/evidence-gate/actions/workflows/test.yml/badge.svg)](https://github.com/LopezDray/evidence-gate/actions/workflows/test.yml)
+[![npm](https://img.shields.io/npm/v/evidence-gate)](https://www.npmjs.com/package/evidence-gate)
+[![PyPI](https://img.shields.io/pypi/v/evidence-gate-py)](https://pypi.org/project/evidence-gate-py/)
+[![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 **Stop your AI from making up facts about your own data.**
 
 A tiny, zero-dependency gate you call **before** an LLM generates anything. It looks at the records you actually have and returns whether the model may summarize, whether the data is stale or low-quality, and the exact caveats to inject into your prompt.
@@ -118,6 +123,21 @@ digest: `evidenceDigest({ records, supporting }) === logged.digests.evidence`.
 Digests are FNV-1a 64 over canonical JSON — deterministic and identical across
 the JS and Python ports (not cryptographic; they detect drift, not adversaries).
 See `examples/decision-log.mjs` for the full flow.
+
+**Make the log tamper-evident.** Chain each record to the one before it with
+`chainDecision`, then `verifyDecisionChain` replays the whole log and reports
+the first broken link — editing any past line invalidates every record after it:
+
+```js
+const record = chainDecision(gate.decision, prevDigest); // prevDigest = evidenceDigest(previous record)
+appendFileSync("decisions.jsonl", JSON.stringify(record) + "\n");
+// …later:
+verifyDecisionChain(log); // → { valid: false, brokenAt: 3 } if line 3's ancestor was edited
+```
+
+`prev` is an additive field — the record stays `evidence-gate.decision/1`. Not
+cryptographic: it catches after-the-fact edits, not a forger who rewrites the
+whole tail. See `examples/tamper-evident-log.mjs`.
 
 ## Provenance — prove where the evidence came from
 

@@ -9,6 +9,7 @@ from evidence_gate.core import (
     classify_status, derive_allowed_actions, evidence_gate, validate_rules,
     validate_provenance, AUTHORITY_LADDER,
     canonical_json, fnv1a64, evidence_digest, DECISION_SCHEMA,
+    chain_decision, verify_decision_chain,
 )
 from evidence_gate.presets import FINANCE, HEALTH
 from evidence_gate.verify import verify_claims, citation_block, VERIFICATION_SCHEMA
@@ -191,6 +192,23 @@ def test_shared_vectors():
     for v in vectors["digest"]:
         assert evidence_digest(v["value"]) == v["expected"], v["name"]
 
+    for c in vectors["decisionChain"]:
+        # records use only port-neutral keys -> chain digests must equal JS
+        chain = []
+        prev = None
+        for i, r in enumerate(c["records"]):
+            linked = chain_decision(r, prev)
+            assert linked["prev"] == c["expectedPrev"][i], (c["name"], i, linked["prev"])
+            chain.append(linked)
+            prev = evidence_digest(linked)
+        v = verify_decision_chain(chain)
+        assert v["valid"] is True and v["broken_at"] is None, (c["name"], v)
+        for t in c["tampers"]:
+            tampered = [dict(r) for r in chain]
+            tampered[t["index"]][t["field"]] = t["value"]
+            tv = verify_decision_chain(tampered)
+            assert tv["valid"] is False and tv["broken_at"] == t["brokenAt"], (c["name"], t["name"], tv)
+
     for c in vectors["gate"]:
         name = c["name"]
         records = [_map_record(r) for r in c["records"]]
@@ -343,6 +361,44 @@ def test_provenance():
         assert "min_authority" in str(err) and "|".join(AUTHORITY_LADDER) in str(err)
 
 
+def test_decision_chain():
+    recs = [rec(95, 5)] * 4
+    decs = [
+        evidence_gate(records=recs, rules=FINANCE, decision={"id": "d1", "at": "2026-07-11T10:00:00Z"})["decision"],
+        evidence_gate(records=recs[:3], rules=FINANCE, decision={"id": "d2", "at": "2026-07-11T10:00:05Z"})["decision"],
+        evidence_gate(records=[], rules=FINANCE, decision={"id": "d3", "at": "2026-07-11T10:00:09Z"})["decision"],
+    ]
+    chain = []
+    prev = None
+    for d in decs:
+        linked = chain_decision(d, prev)
+        chain.append(linked)
+        prev = evidence_digest(linked)
+
+    assert chain[0]["schema"] == DECISION_SCHEMA  # additive "prev", schema stays /1
+    assert chain[0]["prev"] is None
+    assert verify_decision_chain(chain) == {"valid": True, "broken_at": None}
+
+    # editing a past record (its caller id) breaks the chain at the next link
+    tampered = [dict(r) for r in chain]
+    tampered[0]["id"] = "HACKED"
+    assert verify_decision_chain(tampered) == {"valid": False, "broken_at": 1}
+
+    # JSONL round-trip preserves the chain
+    round_trip = [json.loads(json.dumps(r)) for r in chain]
+    assert verify_decision_chain(round_trip)["valid"] is True
+
+    # API edges
+    assert chain_decision({"a": 1})["prev"] is None
+    d = {"a": 1}
+    chain_decision(d, "x")
+    assert "prev" not in d  # does not mutate input
+    assert verify_decision_chain([]) == {"valid": True, "broken_at": None}
+    assert verify_decision_chain(None)["valid"] is True
+    assert verify_decision_chain([chain_decision({"a": 1}, "fnv1a64:dead")])["broken_at"] == 0
+    assert verify_decision_chain([None])["broken_at"] == 0
+
+
 def test_citation_block_overrides():
     records = [{"date": "2026-03-31", "quality_score": 92}]
     block = citation_block(records, {"header": "HDR:", "line": lambda r, marker, i: f"* {marker} -> {r['date']}"})
@@ -356,5 +412,5 @@ if __name__ == "__main__":
     test_digest_primitives(); test_decision_record()
     test_rules_validation(); test_shared_vectors()
     test_verification_record(); test_citation_block_overrides()
-    test_provenance()
+    test_provenance(); test_decision_chain()
     print("all tests passed")

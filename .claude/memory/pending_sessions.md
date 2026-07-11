@@ -2,11 +2,12 @@
 
 ## พร้อมทำ (เรียงตามลำดับ)
 
-1. **P3-3 Release v1.0 + case study** — CHANGELOG `[Unreleased]` มีเนื้อครบแล้ว
-   · Claude เตรียมได้ถึงข้อ 7 ของ `.claude/skills/release-checklist.md`
-   · **ติดเจ้าของ**: publish npm/PyPI + tag + เนื้อหา case study จาก DaddyInvestor
-   · อย่าลืม: bump version 4 จุด (ดู checklist — sync เป็น 0.2.0 ครบแล้ว 2026-07-11)
-2. **P0-2 CI badge** — เพิ่ม badge บน README (#2) — งานเล็ก ทำแทรกได้
+1. **P3-3 Release v1.0** — prep เสร็จถึงข้อ 7 แล้ว (bump 1.0.0, CHANGELOG `[1.0.0]`,
+   release notes `docs/release-notes-v1.0.md`) รอ merge PR แล้ว **ติดเจ้าของล้วน**:
+   ข้อ 8-11 ของ `release-checklist.md` = tag `v1.0.0` + `npm publish` + PyPI + GitHub Release
+   · **case study**: `docs/case-study-daddyinvestor.md` เป็น skeleton — เจ้าของเติมตัวเลขจริง
+   (ห้ามแต่งเลข) แล้วค่อยลิงก์จาก README
+2. ~~P0-2 CI badge~~ ✅ เสร็จ (README badges test/npm/PyPI/license)
 
 ## ติดเจ้าของล้วน (Claude ไม่ต้องแตะ)
 
@@ -16,9 +17,16 @@
 
 - **P3-4 Dashboard self-host** — เริ่มได้เมื่อ: ผู้ใช้จริง ≥10 **หรือ** มีคนขอ ≥3 (#8)
 
-## Follow-up เล็กที่จดไว้ (ทำเมื่อผ่านทางนั้น)
+## งานหลักเหลือ (Fable-profile: cross-port determinism)
+
+- **Fact cross-checking** (`verify_misquoted_value`, claim-verification §8) — record แนบ
+  `facts`, verifyClaims เช็คตัวเลขในประโยคที่ cite ตรงกับ fact จริง · **ต้อง design ปิด
+  กติกา normalize ที่ byte-identical ก่อน** (เลขไทย/ตัวคั่น/สกุลเงิน/rounding) · ตัว moat ที่ใหญ่สุดที่เหลือ
+- ~~tamper-evident chain~~ ✅ เสร็จ (fold เข้า 1.0.0)
+
+## Follow-up เล็กที่จดไว้ (โมเดลไหนก็ทำได้ — MCP JS-only ไม่มี parity)
 
 - MCP server ควรได้ tool `verify_claims` (spec §11 บอก "for free in a follow-up")
 - `evidenceGate` ยังไม่รับ `supporting` ผ่าน MCP `check_evidence` แบบมี tier ใน docs — เช็คตอนทำ verify_claims tool
 
-_อัปเดตล่าสุด: 2026-07-11 (session Fable — Phase 3 implement ครบ + สร้างระบบปฏิบัติงาน)_
+_อัปเดตล่าสุด: 2026-07-11 (Phase 3 implement ครบ + ระบบปฏิบัติงาน merge PR #13 · main = `9fa5af0`)_

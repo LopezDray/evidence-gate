@@ -7,7 +7,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { evidenceGate, canonicalJson, fnv1a64, evidenceDigest, validateProvenance } from "../src/core.js";
+import { evidenceGate, canonicalJson, fnv1a64, evidenceDigest, validateProvenance, chainDecision, verifyDecisionChain } from "../src/core.js";
 import { verifyClaims, citationBlock } from "../src/verify.js";
 
 const vectors = JSON.parse(readFileSync(join(dirname(fileURLToPath(import.meta.url)), "vectors.json"), "utf8"));
@@ -32,6 +32,27 @@ for (const v of vectors.canonicalJson) {
 // ── digests over arbitrary values ─────────────────────────────────────────────
 for (const v of vectors.digest) {
   ok(`digest: ${v.name}`, evidenceDigest(v.value) === v.expected, evidenceDigest(v.value));
+}
+
+// ── tamper-evident decision chain: byte-identical digests across ports ────────
+for (const c of vectors.decisionChain) {
+  const chain = [];
+  let prev = null;
+  for (let i = 0; i < c.records.length; i++) {
+    const linked = chainDecision(c.records[i], prev);
+    ok(`chain ${c.name}: link ${i} prev`, linked.prev === c.expectedPrev[i], JSON.stringify(linked.prev));
+    chain.push(linked);
+    prev = evidenceDigest(linked);
+  }
+  const v = verifyDecisionChain(chain);
+  ok(`chain ${c.name}: valid chain verifies`, v.valid === true && v.brokenAt === null, JSON.stringify(v));
+  for (const t of c.tampers) {
+    const tampered = chain.map((r) => ({ ...r }));
+    tampered[t.index][t.field] = t.value;
+    const tv = verifyDecisionChain(tampered);
+    ok(`chain ${c.name}: tamper ${t.name} breaks at ${t.brokenAt}`,
+      tv.valid === false && tv.brokenAt === t.brokenAt, JSON.stringify(tv));
+  }
 }
 
 // ── full gate behavior ────────────────────────────────────────────────────────

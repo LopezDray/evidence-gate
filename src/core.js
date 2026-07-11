@@ -199,6 +199,40 @@ export function evidenceDigest(value) {
   return "fnv1a64:" + fnv1a64(canonicalJson(value));
 }
 
+// ── Tamper-evident decision chain ─────────────────────────────────────────────
+// Turn a decision log into a hash chain: each record carries `prev`, the
+// evidenceDigest() of the record written before it. Because a record's digest
+// covers its own `prev`, editing any past JSONL line changes its digest and
+// breaks the `prev` of every record after it — cheap, zero-dependency
+// tamper-evidence (NOT cryptographic; same stance as the digest note above).
+// `prev` is an additive optional field: the record stays
+// evidence-gate.decision/1, and records outside a chain simply omit it.
+
+//   chainDecision(decision, prevDigest?) → { ...decision, prev }
+//   Pass the previous chained record's evidenceDigest() as `prevDigest`; the
+//   first record in a chain takes `null` (the default). Pure — the caller
+//   persists the returned record and threads its digest into the next call.
+export function chainDecision(decision, prevDigest = null) {
+  return { ...decision, prev: prevDigest ?? null };
+}
+
+//   verifyDecisionChain(records) → { valid, brokenAt }
+//   Replays a chain of decision records (in the order they were written) and
+//   reports the first record whose `prev` doesn't match the digest of the one
+//   before it — `brokenAt` is that index, or null when the whole chain holds.
+//   The head must carry `prev: null`. Never throws.
+export function verifyDecisionChain(records) {
+  const list = records || [];
+  for (let i = 0; i < list.length; i++) {
+    const rec = list[i];
+    if (rec === null || typeof rec !== "object" || Array.isArray(rec)) return { valid: false, brokenAt: i };
+    const expectedPrev = i === 0 ? null : evidenceDigest(list[i - 1]);
+    const actualPrev = rec.prev ?? null;
+    if (actualPrev !== expectedPrev) return { valid: false, brokenAt: i };
+  }
+  return { valid: true, brokenAt: null };
+}
+
 // ── evidenceGate: the one-call API ────────────────────────────────────────────
 //   evidenceGate({ records, supporting, rules, decision? })
 //     → { status, freshness, allowedActions, warnings, caveats, decision? }
