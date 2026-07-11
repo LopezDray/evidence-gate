@@ -66,7 +66,8 @@ verifyClaims({
   verdict: "supported" | "unsupported_claims" | "no_citations" | "phantom_citations",
   citations: [ { marker: "ev:2", ref: "2", record: 1, valid: true } ],   // record = resolved index | null
   claims:    [ { text, cited: true, markers: ["ev:2"] } ],               // claim-looking sentences only
-  stats: { claims: 4, cited: 3, uncited: 1, phantom: 0 },
+  misquotes: [ { token: "1.5M", value: 1500000, sentence: "…" } ],       // §8 — empty unless facts caught a misquote
+  stats: { claims: 4, cited: 3, uncited: 1, phantom: 0, misquoted: 0 },
   warnings: [ { level, code, message } ],   // same shape as gate warnings
   caveats: [ "…" ],                         // ready to feed a retry prompt or footer disclosure
   decision?                                  // evidence-gate.verification/1 (§7)
@@ -94,7 +95,8 @@ Defaults (shared verbatim across ports):
 
 | pattern | catches |
 |---|---|
-| `\d` | any digit — amounts, dates, counts, percents |
+| `\d` | any ASCII digit — amounts, dates, counts, percents |
+| `[๐-๙]` | Thai numerals (added with §8 — an explicit range, NOT Unicode `\d`) |
 | `%|\$|€|£|฿` | symbols that imply a quantity even without digits nearby |
 
 Sentence segmentation: split on `[.!?]` followed by whitespace, and on
@@ -113,11 +115,13 @@ Evaluated top-down, first hit wins:
 
 1. **`phantom_citations`** — ≥1 marker fails to resolve. The model invented
    evidence; worst outcome, always `pass: false`.
-2. **`no_citations`** — ≥1 claim detected, zero valid markers in the whole
+2. **`misquoted_values`** — ≥1 cited number disagrees with the cited
+   record's facts (§8, only when facts are attached). Always `pass: false`.
+3. **`no_citations`** — ≥1 claim detected, zero valid markers in the whole
    answer. The protocol was ignored; `pass: false`.
-3. **`unsupported_claims`** — some claims lack markers. `pass` depends on
+4. **`unsupported_claims`** — some claims lack markers. `pass` depends on
    `rules.verification.requireFullCoverage` (default **true** → false).
-4. **`supported`** — every claim carries ≥1 valid citation; `pass: true`.
+5. **`supported`** — every claim carries ≥1 valid citation; `pass: true`.
 
 An answer with no claims at all (e.g. a refusal, or "I don't have data on
 NEWCO") is `supported` — refusing correctly must pass the loop.
@@ -130,7 +134,8 @@ NEWCO") is `supported` — refusing correctly must pass the loop.
 | `verify_uncited_claim` | review | claim sentence without a valid marker |
 | `verify_no_citations` | block | claims exist, protocol ignored |
 | `verify_stale_framing` | review | `gate.freshness === "stale"` and the answer matches freshness-claim patterns (default `\b(today|as of now|currently|latest|real[- ]?time)\b/i`, overridable — English-only by default, apps localize via `rules.verification.freshnessPatterns`) |
-| `verify_forbidden_leak` | block | *(future, needs facts §8 or judge §9 — reserved code, not in v1)* |
+| `verify_misquoted_value` | block | a number in a cited claim disagrees with the cited record's `facts` (§8 — no `gate` needed, fires whenever facts are attached) |
+| `verify_forbidden_leak` | block | *(future, needs judge §9 — reserved code, not implemented)* |
 
 All messages overridable via `rules.messages` exactly like gate warnings.
 
@@ -160,20 +165,139 @@ evidence digest, each replay-verifiable, with neither the evidence nor the
 answer stored. Additive versioning policy from `docs/design/provenance.md`
 applies.
 
-## 8. Future: fact cross-checking (v1.x, spec'd but not in scope)
+## 8. Fact cross-checking — `verify_misquoted_value`
+
+Status: **full spec — approved 2026-07-11** (owner resolutions: strict
+matching, exact equality, Thai numerals fully supported, new verdict rung —
+see §12). Supersedes the v1 concept sketch that lived in this section.
 
 Records today are metadata-only — the gate never sees values, so a correctly
-cited but **misquoted number** passes §5. If apps opt in by attaching facts:
+cited but **misquoted number** passes §5. Apps opt in per record by attaching
+`facts`:
 
 ```js
 { date: "2026-03-31", qualityScore: 92, facts: { revenue: 1234500, eps: 0.42 } }
 ```
 
-then for each cited claim, every number in the sentence is normalized
-(strip `,`/`%`/currency, parse) and must appear among the cited record's fact
-values → new `verify_misquoted_value` (block). Deterministic misquote
-detection with no model — likely the single most differentiating feature of
-the loop; kept out of v1 only to keep the first release reviewable.
+Deterministic misquote detection with no model — no new rules knobs at all:
+the strict + exact resolutions make the feature zero-config. Everything below
+is normative and must be byte-identical across the JS and Python ports.
+
+### 8.1 When a sentence is fact-checked
+
+A sentence is fact-checked iff it is a **claim** (§4) **and** carries ≥1
+**valid** citation. Its *fact pool* is the union of numeric fact values from
+every validly cited record (primary and supporting alike) that has *usable
+facts*:
+
+- *usable facts* = `facts` is a plain object with **≥1 finite numeric value**
+  (booleans excluded). An absent `facts`, `{}`, an array, or an all-string
+  object is NOT usable — spelled out to dodge the `{}` truthiness port trap.
+- Non-numeric and nested values inside `facts` are ignored (v1 of the
+  feature is flat numbers only). `NaN`/`Infinity` are ignored (can't come
+  from JSON anyway).
+
+Empty pool → the sentence is **skipped silently**. No facts anywhere → the
+whole feature is inert; `verifyClaims` behaves exactly as before (opt-in,
+never a new failure mode for existing callers). Uncited claims are not
+fact-checked — they are already flagged `verify_uncited_claim`.
+
+### 8.2 Number extraction (byte-identical pipeline)
+
+Runs on the **marker-stripped** sentence (same string claim detection sees),
+in this exact order:
+
+1. **Thai digit translation** — ๐–๙ (U+0E50–U+0E59) map to 0–9 via an
+   explicit table in each port. Never rely on Unicode `\d` (the Python port
+   compiles all patterns with `re.ASCII`).
+2. **ISO date masking** — every match of `(?<![0-9])[0-9]{4}-[0-9]{2}-[0-9]{2}(?![0-9])`
+   is replaced with a single space, so date components never leak into
+   matching. Only ISO `YYYY-MM-DD` is masked; other date shapes are ordinary
+   numbers under the strict rule.
+3. **Token regex** — one source string, shared verbatim (Python compiles it
+   with `re.ASCII`; every class is explicit so the flag is belt-and-braces):
+
+   ```
+   (?<![0-9.])(-?)([0-9]{1,3}(?:,[0-9]{3})+|[0-9]+)((?:\.[0-9]+)?)(?:[ \t]?(ล้านล้าน|แสนล้าน|หมื่นล้าน|พันล้าน|ล้าน|แสน|หมื่น|พัน|[KkMmBb](?![A-Za-z0-9])))?
+   ```
+
+   Groups: 1 = sign, 2 = integer part (comma thousands separators allowed),
+   3 = `.fraction` or empty, 4 = magnitude suffix or none. The lookbehind
+   keeps ranges positive (`3-5%` → `3`, `5` — never `-5`) and stops
+   `v1.2.3`-style tails; the lookahead keeps `512MB`, `10Kg` from reading as
+   magnitudes. A single space/tab may separate number and suffix
+   (`1.5 ล้าน`). Comma is the only thousands separator. Scientific notation
+   is unsupported by design (`1e6` reads as `1` and `6`).
+
+4. **Magnitude table** (fixed constant, NOT overridable): `K`/`k` → 10³,
+   `M`/`m` → 10⁶, `B`/`b` → 10⁹, `พัน` → 10³, `หมื่น` → 10⁴, `แสน` → 10⁵,
+   `ล้าน` → 10⁶, `พันล้าน` → 10⁹, `หมื่นล้าน` → 10¹⁰, `แสนล้าน` → 10¹¹,
+   `ล้านล้าน` → 10¹². Longest-first alternation in the regex resolves the
+   compounds. Known accepted limitation: Thai has no word boundaries, so
+   e.g. `1 ล้านนา` reads a magnitude — irrelevant in financial answers.
+
+5. **Canonical value — decimal-point shift, never float multiply.**
+   `1.2 * 1e6 === 1199999.9999999998…` in IEEE-754; a float multiply breaks
+   exact matching identically in BOTH ports. Instead build the canonical
+   decimal string by shifting the point, then parse **once**:
+
+   - `I` = integer digits with separators stripped; `F` = fraction digits or
+     empty; `e` = suffix exponent (0 if none)
+   - `digits = I + F`, point position `p = len(I) + e`
+   - `p ≥ len(digits)` → `whole = digits + "0" × (p − len(digits))`,
+     `frac = ""`; else `whole = digits[:p]`, `frac = digits[p:]`
+   - strip leading zeros of `whole` (empty → `"0"`); strip trailing zeros of
+     `frac`
+   - `canonical = sign + whole + ("." + frac if frac else "")`
+   - `value = parseFloat(canonical)` / `float(canonical)` — string→double is
+     correctly rounded and identical across ports
+
+   `%` is **not** part of the token: `8%` → `8` (facts store percentages as
+   displayed — `8`, not `0.08`). Currency symbols are never extracted.
+
+### 8.3 Matching rule — strict, exact
+
+**Every** extracted token in a fact-checked sentence must equal
+(IEEE-754 double equality; Python int facts compare numerically) **some**
+value in the sentence's fact pool. No tolerance of any kind: `1.2M`
+(= 1,200,000 exactly) vs fact `1234500` is a misquote; so is `1.23M`.
+Rounded prose must either match a rounded fact the app chose to publish, or
+be rewritten with the exact number.
+
+Consequence chosen deliberately: contextual numbers in a cited sentence —
+years (`2026`), quarter ordinals, counts — must themselves appear in `facts`,
+or the sentence blocks. Strictness is the product: the app controls both the
+facts and (via retry) the wording. ISO dates are masked (§8.2) as the one
+concession, because `record.date` is already first-class metadata.
+
+Every failing token **occurrence** appends `{ token, value, sentence }` to
+`misquotes` (token as written, matched text; value as parsed) and increments
+`stats.misquoted`. Facts and stated values must live within the
+double-exact range (|x| ≤ 2⁵³, no sub-ULP distinctions) — outside it the
+ports may legitimately disagree and behavior is unspecified.
+
+### 8.4 Result contract & verdict placement
+
+- `misquotes: [ { token, value, sentence } ]` — always present (empty array
+  when nothing failed or feature inert).
+- `stats` gains `misquoted` (always present, additive).
+- Verdict ladder (§5) gains rung 2: `phantom_citations` →
+  **`misquoted_values`** → `no_citations` → `unsupported_claims` →
+  `supported`. `pass: false` always. (`misquoted_values` needs a valid
+  citation while `no_citations` needs zero, so rungs 2–3 can never compete.)
+- Warning `verify_misquoted_value` (**block**) fires whenever
+  `stats.misquoted > 0` — even when phantom wins the verdict — ordered after
+  `verify_phantom_citation`, before the `verify_no_citations` /
+  `verify_uncited_claim` slot. Message lists unique offending tokens in
+  order of appearance; overridable via `rules.messages` as usual.
+- The verification record (§7) stays schema `/1`: `stats.misquoted` is an
+  additive field, and the verdict enum was always an open set — consumers
+  must not exhaustively match it.
+- Default claim patterns (§4) become `["\\d", "[๐-๙]", "%|\\$|€|£|฿"]` —
+  Thai-numeral sentences now count as claims. This deliberately updates the
+  vector that previously locked ๑๒ as a non-claim (a spec'd behavior change
+  applied to both ports and the vector in the same commit — not a
+  make-it-pass edit).
 
 ## 9. Out of core: the judge interface
 
@@ -239,3 +363,17 @@ Review clarifications (WP1):
   `[records..., supporting...]`; the resolved `citations[].record` field is
   the **0-based** index into that same concatenation (e.g. ref `"2"` →
   `record: 1`).
+
+§8 fact cross-checking — RESOLVED (2026-07-11, owner):
+
+1. **Checkability: strict** — every number in a cited claim sentence is
+   checked (only ISO dates are masked). Years/counts must be in `facts` or
+   the sentence blocks; the app owns that discipline.
+2. **Tolerance: exact only** — `1.2M` must equal the fact exactly
+   (1,200,000); no half-unit or percent tolerance. Zero config knobs.
+3. **Thai numerals: full support** — `[๐-๙]` joins the default claim
+   patterns and Thai digits are translated before extraction. The old
+   vector locking ๑๒ as a non-claim is deliberately updated.
+4. **Verdict: new rung** — `misquoted_values` sits between
+   `phantom_citations` and `no_citations`; the verdict enum is an open set,
+   schema stays `/1`.
