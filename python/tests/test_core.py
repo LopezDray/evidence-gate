@@ -1,14 +1,67 @@
 """Evidence Gate — core tests: python -m pytest  (or: python tests/test_core.py)"""
+import json
 import os
 import sys
 from datetime import date, timedelta
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from evidence_gate.core import (
-    classify_status, derive_allowed_actions, evidence_gate,
+    classify_status, derive_allowed_actions, evidence_gate, validate_rules,
+    validate_provenance, AUTHORITY_LADDER,
     canonical_json, fnv1a64, evidence_digest, DECISION_SCHEMA,
 )
 from evidence_gate.presets import FINANCE, HEALTH
+from evidence_gate.verify import verify_claims, citation_block, VERIFICATION_SCHEMA
+
+# Shared cross-port vectors (test/vectors.json) are written in the JS port's
+# camelCase convention; these maps translate to this port's snake_case.
+VECTORS_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "test", "vectors.json")
+RULES_KEY_MAP = {
+    "staleDays": "stale_days",
+    "minRecords": "min_records",
+    "qualityThreshold": "quality_threshold",
+    "primaryLabel": "primary_label",
+    "forbiddenActions": "forbidden_actions",
+    "messages": "messages",
+    "provenance": "provenance",
+    "minAuthority": "min_authority",
+}
+RECORD_KEY_MAP = {"qualityScore": "quality_score"}
+VERIFICATION_KEY_MAP = {
+    "requireFullCoverage": "require_full_coverage",
+    "claimPatterns": "claim_patterns",
+    "freshnessPatterns": "freshness_patterns",
+}
+PROVENANCE_KEY_MAP = {"retrievedAt": "retrieved_at", "contentHash": "content_hash"}
+CHAIN_KEY_MAP = {"inputHash": "input_hash", "outputHash": "output_hash"}
+
+
+def _map_keys(obj, key_map):
+    """Translate top-level dict keys only; values (incl. nested dicts) pass through."""
+    if isinstance(obj, dict):
+        return {key_map.get(k, k): v for k, v in obj.items()}
+    return obj
+
+
+def _map_record(record):
+    """Record translation incl. the nested provenance block and its chain."""
+    r = _map_keys(record, RECORD_KEY_MAP)
+    if isinstance(r, dict) and isinstance(r.get("provenance"), dict):
+        p = _map_keys(r["provenance"], PROVENANCE_KEY_MAP)
+        if isinstance(p.get("chain"), list):
+            p["chain"] = [_map_keys(s, CHAIN_KEY_MAP) for s in p["chain"]]
+        r = dict(r, provenance=p)
+    return r
+
+
+def _map_rules(rules):
+    """Rules translation incl. the nested provenance and verification knobs."""
+    r = _map_keys(rules, RULES_KEY_MAP)
+    if isinstance(r, dict) and isinstance(r.get("provenance"), dict):
+        r = dict(r, provenance=_map_keys(r["provenance"], RULES_KEY_MAP))
+    if isinstance(r, dict) and isinstance(r.get("verification"), dict):
+        r = dict(r, verification=_map_keys(r["verification"], VERIFICATION_KEY_MAP))
+    return r
 
 
 def iso(days_ago):
@@ -100,7 +153,208 @@ def test_decision_record():
     assert g_none["decision"]["counts"]["records"] == 0
 
 
+def test_rules_validation():
+    # explicit None for optional fields behaves like the JS port's null (absent)
+    ok_rules = {"stale_days": 30, "min_records": 1, "quality_threshold": 50,
+                "forbidden_actions": None, "messages": None, "primary_label": None}
+    g = evidence_gate(records=[{"date": "2026-01-01"}], rules=ok_rules)
+    assert g["status"] == "available"
+    assert validate_rules(ok_rules) is ok_rules  # returns rules for chaining
+
+    # classify_status validates too — incomplete rules can never silently pass
+    try:
+        classify_status([{"date": "2026-01-01"}], {"stale_days": 30})
+        raise AssertionError("classify_status must reject incomplete rules")
+    except ValueError as err:
+        assert "min_records" in str(err)
+
+    # validation fires even with empty records (the old JS silent-fresh hole)
+    try:
+        evidence_gate(records=[], rules={"stale_days": 30})
+        raise AssertionError("evidence_gate must reject incomplete rules")
+    except ValueError:
+        pass
+
+
+def test_shared_vectors():
+    """Run test/vectors.json — the same file the JS suite runs. A failure here
+    (with the JS side green) means the two ports have diverged."""
+    with open(VECTORS_PATH, encoding="utf-8") as f:
+        vectors = json.load(f)
+
+    for v in vectors["fnv1a64"]:
+        assert fnv1a64(v["input"]) == v["expected"], v["input"]
+
+    for v in vectors["canonicalJson"]:
+        assert canonical_json(v["value"]) == v["expected"], v["name"]
+
+    for v in vectors["digest"]:
+        assert evidence_digest(v["value"]) == v["expected"], v["name"]
+
+    for c in vectors["gate"]:
+        name = c["name"]
+        records = [_map_record(r) for r in c["records"]]
+        supporting = [_map_record(r) for r in c["supporting"]]
+        rules = _map_rules(c["rules"])
+        g = evidence_gate(records=records, supporting=supporting, rules=rules, decision=True)
+        e = c["expected"]
+        assert g["status"] == e["status"], name
+        assert g["freshness"] == e["freshness"], name
+        assert g["allowed_actions"] == e["allowedActions"], name
+        got_warnings = [{"level": w["level"], "code": w["code"]} for w in g["warnings"]]
+        assert got_warnings == e["warnings"], name
+        if "caveats" in e:
+            assert g["caveats"] == e["caveats"], name
+        if "evidenceDigest" in e:
+            # byte-identical digest across ports — the audit-trail guarantee
+            assert g["decision"]["digests"]["evidence"] == e["evidenceDigest"], name
+        if "provenance" in e:
+            ep = e["provenance"]
+            p = g["decision"]["provenance"]
+            assert p["covered"] == ep["covered"] and p["total"] == ep["total"], name
+            assert p["broken_chains"] == ep["brokenChains"], name
+            assert p["sources"] == ep["sources"], (name, p["sources"])
+            if "digest" in ep:
+                # provenance digest byte-identical across ports (neutral keys)
+                assert p["digest"] == ep["digest"], name
+
+    for c in vectors["validateProvenance"]:
+        got = validate_provenance(_map_record(c["record"]))
+        assert got == c["expected"], (c["name"], got)
+
+    for c in vectors["citationBlock"]:
+        records = [_map_record(r) for r in c["records"]]
+        supporting = [_map_record(r) for r in c.get("supporting") or []]
+        got = citation_block(records, {"supporting": supporting})
+        assert got == c["expected"], (c["name"], got)
+
+    for c in vectors["verify"]:
+        name = c["name"]
+        records = [_map_record(r) for r in c["records"]]
+        supporting = [_map_record(r) for r in c.get("supporting") or []]
+        rules = _map_rules(c["rules"]) if c.get("rules") else c.get("rules")
+        v = verify_claims(answer=c["answer"], records=records, supporting=supporting,
+                          gate=c.get("gate"), rules=rules, decision=True)
+        e = c["expected"]
+        assert v["pass"] == e["pass"], name
+        assert v["verdict"] == e["verdict"], name
+        assert v["stats"] == e["stats"], name
+        got_warnings = [{"level": w["level"], "code": w["code"]} for w in v["warnings"]]
+        assert got_warnings == e["warnings"], name
+        if "citations" in e:
+            assert v["citations"] == e["citations"], (name, v["citations"])
+        if "claims" in e:
+            assert v["claims"] == e["claims"], (name, v["claims"])
+        if "caveats" in e:
+            assert v["caveats"] == e["caveats"], (name, v["caveats"])
+        if "evidenceDigest" in e:
+            assert v["decision"]["digests"]["evidence"] == e["evidenceDigest"], name
+        if "answerDigest" in e:
+            # byte-identical answer digest across ports
+            assert v["decision"]["digests"]["answer"] == e["answerDigest"], name
+
+    for c in vectors["invalidRules"]:
+        rules = _map_rules(c["rules"])
+        try:
+            evidence_gate(records=[], rules=rules)
+            raise AssertionError(f"invalid rules case {c['name']} did not raise")
+        except ValueError as err:
+            if c["errorField"] is not None:
+                # dotted paths ("provenance.minAuthority") translate per segment
+                parts = [RULES_KEY_MAP.get(p, p) for p in c["errorField"].split(".")]
+                expect = 'rules["' + '"]["'.join(parts) + '"]'
+                assert expect in str(err), (c["name"], str(err))
+
+
+def test_verification_record():
+    records = [{"date": "2026-03-31"}, {"date": "2025-12-31"}]
+    answer = "Revenue was 1.2M [ev:1]. Cash was 3M [ev:2]."
+
+    # opt-in only
+    assert "decision" not in verify_claims(answer=answer, records=records)
+
+    v = verify_claims(answer=answer, records=records,
+                      decision={"id": "req-9", "at": "2026-07-11T10:00:00Z"})
+    d = v["decision"]
+    assert d["schema"] == VERIFICATION_SCHEMA == "evidence-gate.verification/1"
+    assert d["id"] == "req-9" and d["at"] == "2026-07-11T10:00:00Z"
+    assert d["verdict"] == v["verdict"] and d["pass"] == v["pass"]
+    assert d["stats"] == v["stats"]
+    assert all("message" not in w for w in d["warnings"])
+
+    # the digest join: same records -> gate decision and verification record
+    # carry the SAME evidence digest; the answer digest is separate
+    g = evidence_gate(records=records, rules=FINANCE, decision={"id": "req-9"})
+    assert g["decision"]["digests"]["evidence"] == d["digests"]["evidence"]
+    assert d["digests"]["answer"] != d["digests"]["evidence"]
+
+    # privacy: neither the answer nor the evidence appears in the record
+    blob = json.dumps(d)
+    assert "Revenue" not in blob and "2026-03-31" not in blob
+    assert "\n" not in blob  # JSONL-serializable
+
+    # messy input never raises
+    assert verify_claims(answer=None, records=None)["verdict"] == "supported"
+    assert verify_claims(answer=12345, records=records)["verdict"] == "no_citations"
+
+    # marker binds to its sentence: a valid citation in one sentence does not
+    # cover a claim in another
+    v2 = verify_claims(answer="Revenue was 1.2M [ev:1]. Cash was 3M.", records=records)
+    assert v2["verdict"] == "unsupported_claims" and v2["stats"]["uncited"] == 1
+
+    # duplicate markers are counted per occurrence in citations[]
+    v3 = verify_claims(answer="Revenue 1M [ev:1] [ev:1].", records=records)
+    assert len(v3["citations"]) == 2 and v3["stats"]["cited"] == 1
+
+
+def test_provenance():
+    prov = {"source": {"id": "sec-edgar", "type": "filing", "authority": "official"}}
+    records = [rec(95, 5, provenance=prov), rec(95, 5, provenance=prov), rec(95, 5), rec(95, 5)]
+
+    # decision.provenance is additive and NOT gated on rules["provenance"]
+    g_plain = evidence_gate(records=[rec(95, 5)] * 4, rules=FINANCE, decision=True)
+    assert "provenance" not in g_plain["decision"]
+    g = evidence_gate(records=records, rules=FINANCE, decision=True)
+    p = g["decision"]["provenance"]
+    assert p["covered"] == 2 and p["total"] == 4 and p["broken_chains"] == 0
+    assert p["sources"] == [{"id": "sec-edgar", "type": "filing", "authority": "official", "records": 2}]
+    assert g["decision"]["schema"] == DECISION_SCHEMA  # still /1, block is additive
+
+    # replay: recompute over the claimed provenance set, in record order
+    assert evidence_digest([r["provenance"] for r in records if "provenance" in r]) == p["digest"]
+
+    # warnings only with rules["provenance"]; status/actions never change
+    assert not any(w["code"].startswith("provenance_") for w in g["warnings"])
+    strict = evidence_gate(records=records,
+                           rules=dict(FINANCE, provenance={"require": True, "min_authority": "official"}))
+    assert any(w["code"] == "provenance_missing" for w in strict["warnings"])
+    assert strict["status"] == g["status"]
+    assert strict["allowed_actions"] == g["allowed_actions"]
+
+    # validate_provenance never raises on garbage
+    assert validate_provenance(None)["valid"] is True
+    assert "invalid_provenance" in validate_provenance({"provenance": 42})["problems"]
+
+    # bad rules["provenance"] fails fast like every other rules error
+    try:
+        evidence_gate(records=[], rules=dict(FINANCE, provenance={"min_authority": "gospel"}))
+        raise AssertionError("invalid min_authority must raise")
+    except ValueError as err:
+        assert "min_authority" in str(err) and "|".join(AUTHORITY_LADDER) in str(err)
+
+
+def test_citation_block_overrides():
+    records = [{"date": "2026-03-31", "quality_score": 92}]
+    block = citation_block(records, {"header": "HDR:", "line": lambda r, marker, i: f"* {marker} -> {r['date']}"})
+    assert block == "HDR:\n* 1 -> 2026-03-31"
+    # empty evidence -> header only
+    assert citation_block([]) == "EVIDENCE (cite with its marker after every factual statement):"
+
+
 if __name__ == "__main__":
     test_classify(); test_allowed_actions(); test_date_validation(); test_domain_swap()
     test_digest_primitives(); test_decision_record()
+    test_rules_validation(); test_shared_vectors()
+    test_verification_record(); test_citation_block_overrides()
+    test_provenance()
     print("all tests passed")

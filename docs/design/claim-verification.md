@@ -1,8 +1,10 @@
 # Design: Post-generation Claim Verification — `verifyClaims` (P3-2)
 
-Status: **draft for review** — no code yet. Closes the loop that the gate
-opens: the gate decides *whether* the model may speak; `verifyClaims` checks
-*whether what it said stands on the evidence it was given*.
+Status: **approved — ready to implement** (2026-07-02, #8: open questions
+answered "ตามร่างทั้งหมด" — all per draft; see §12 for the resolutions).
+Closes the loop that the gate opens: the gate decides *whether* the model may
+speak; `verifyClaims` checks *whether what it said stands on the evidence it
+was given*.
 
 ```
 retrieve ──► evidenceGate ──► prompt (+ citation block) ──► LLM ──► verifyClaims
@@ -217,13 +219,23 @@ Owner review ~6 hrs. No new dependencies; `record.id` addition is optional and
 backward-compatible; MCP server gains a `verify_claims` tool for free in a
 follow-up.
 
-## 12. Open questions (decide before implementing)
+## 12. Open questions — RESOLVED (2026-07-02, #8: all per draft)
 
-1. `requireFullCoverage` default **true** (strict; draft's choice — the whole
-   point is proof) or false (gentler adoption)?
-2. Marker syntax `[ev:…]` — collision risk with markdown footnote conventions
-   is low but nonzero; accept `⟦ev:…⟧` as an alternate grammar or keep one?
-   (Draft: one grammar only; two grammars = two ways to fail.)
-3. Should `verifyClaims` also accept `supporting` records as citable evidence,
-   or is citing supporting-only evidence itself a warning? (Draft: citable,
-   but tagged in `citations[].tier` so strict apps can reject.)
+1. `requireFullCoverage` default **true** (strict) — the whole point is proof.
+2. Marker syntax: **one grammar only**, `[ev:…]` — two grammars = two ways to
+   fail.
+3. `supporting` records are **citable**, tagged in `citations[].tier`
+   (`"primary"` / `"supporting"`) so strict apps can reject. `verifyClaims`
+   accepts `supporting` as a parameter — also required so its evidence digest
+   equals the gate's (`digest({ records, supporting })`), the join key.
+
+Review clarifications (WP1):
+
+- Record `id`s must **not be purely numeric** (`^\d+$`) — numeric refs are
+  reserved for index resolution, so a numeric id could never be told apart
+  from an index. Invalid ids are silently ignored (the record falls back to
+  its index marker), never an error.
+- Markers/refs are **1-based** positions into the concatenation
+  `[records..., supporting...]`; the resolved `citations[].record` field is
+  the **0-based** index into that same concatenation (e.g. ref `"2"` →
+  `record: 1`).

@@ -1,5 +1,5 @@
 // Evidence Gate — decision log tests (no deps): node test/decision.test.mjs
-import { evidenceGate, canonicalJson, fnv1a64, evidenceDigest, DECISION_SCHEMA } from "../src/core.js";
+import { evidenceGate, canonicalJson, fnv1a64, evidenceDigest, DECISION_SCHEMA, validateProvenance } from "../src/core.js";
 import { FINANCE } from "../src/presets.js";
 
 const iso = (daysAgo) => {
@@ -74,6 +74,50 @@ ok("records:null digests as empty set (cross-port constant)",
   gNull.decision.digests.evidence === "fnv1a64:b154377d61167670",
   gNull.decision.digests.evidence);
 ok("records:null counts as zero", gNull.decision.counts.records === 0);
+
+// ── decision.provenance: additive block + replay ──────────────────────────────
+const provRecords = [
+  rec(95, 5, { provenance: { source: { id: "sec-edgar", type: "filing", authority: "official" } } }),
+  rec(95, 5, { provenance: { source: { id: "sec-edgar", type: "filing", authority: "official" } } }),
+  rec(95, 5), rec(95, 5),
+];
+
+ok("no provenance -> no decision.provenance block",
+  evidenceGate({ records, rules: FINANCE, decision: true }).decision.provenance === undefined);
+
+const gp = evidenceGate({ records: provRecords, rules: FINANCE, decision: true });
+const dp = gp.decision.provenance;
+ok("decision.provenance present without rules.provenance (block is not opt-in)", dp !== undefined);
+ok("decision.provenance coverage", dp.covered === 2 && dp.total === 4 && dp.brokenChains === 0);
+ok("decision.provenance groups sources",
+  dp.sources.length === 1 && dp.sources[0].id === "sec-edgar" && dp.sources[0].records === 2);
+
+// replay: recompute the digest over the claimed provenance set, in record
+// order — exactly like the evidence digest
+const replayed = evidenceDigest(provRecords.filter((r) => r.provenance).map((r) => r.provenance));
+ok("provenance digest is replay-verifiable", replayed === dp.digest, dp.digest);
+
+// schema stays /1 — the block is additive
+ok("schema unchanged by provenance block", gp.decision.schema === DECISION_SCHEMA);
+
+// warnings stay out unless rules.provenance opts in; status never changes
+ok("no provenance warnings without rules.provenance",
+  !gp.warnings.some((w) => w.code.startsWith("provenance_")));
+{
+  const strict = evidenceGate({
+    records: provRecords,
+    rules: { ...FINANCE, provenance: { require: true, minAuthority: "official" } },
+  });
+  ok("rules.provenance adds warnings but never changes status/actions",
+    strict.warnings.some((w) => w.code === "provenance_missing") &&
+    strict.status === gp.status &&
+    JSON.stringify(strict.allowedActions) === JSON.stringify(gp.allowedActions));
+}
+
+// validateProvenance is exported and never throws on garbage
+ok("validateProvenance(null record) is valid", validateProvenance(null).valid === true);
+ok("validateProvenance(garbage) reports, not throws",
+  validateProvenance({ provenance: 42 }).problems.includes("invalid_provenance"));
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail === 0 ? 0 : 1);

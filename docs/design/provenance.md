@@ -1,8 +1,10 @@
 # Design: Evidence Provenance (P3-1)
 
-Status: **draft for review** — no code yet. Companion to the decision log
-(`evidence-gate.decision/1`, shipped) — together they turn "the AI cited a ref"
-into "the system can prove what evidence the answer stood on."
+Status: **approved — ready to implement** (2026-07-02, #8: open questions
+answered "ตามร่างทั้งหมด" — all per draft; see §9 for the resolutions).
+Companion to the decision log (`evidence-gate.decision/1`, shipped) — together
+they turn "the AI cited a ref" into "the system can prove what evidence the
+answer stood on."
 
 ## Goal
 
@@ -202,12 +204,16 @@ Owner review: ~6 hrs total. Everything lands in the existing core files; no
 new dependencies; MCP server inherits it for free (`check_evidence` already
 passes `rules` through).
 
-## 9. Open questions (decide before implementing)
+## 9. Open questions — RESOLVED (2026-07-02, #8: all per draft)
 
-1. Should `minAuthority` compare per-record or against the *best* record?
-   (Draft says per-record — one weak source taints the set with a caveat.)
-2. Attribution caveat when records disagree on source: name the top-N sources
-   or stay silent? (Draft: silent when >2 distinct sources; counts still land
-   in `decision.provenance.sources`.)
-3. Python port: accept both `retrievedAt` and `retrieved_at` on input records,
-   or snake_case only? (Draft: snake_case only, consistent with existing port.)
+1. `minAuthority` compares **per-record** — one weak source taints the set
+   with a caveat. A record whose authority is missing or outside the ladder
+   ranks below `unverified` (always draws `provenance_untrusted` when
+   `minAuthority` is set).
+2. Attribution: named when the provenance-bearing records have **1 or 2
+   distinct sources** (and every one of them has a string `id`); **silent
+   when >2** or when any source is unnamed. Counts still land in
+   `decision.provenance.sources`. The `retrieved <date>` suffix appears only
+   for a single distinct source (latest `retrievedAt`, date part).
+3. Python port accepts **snake_case only** (`retrieved_at`, `content_hash`,
+   `input_hash`/`output_hash`), consistent with the existing port.

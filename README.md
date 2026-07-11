@@ -88,6 +88,12 @@ export const FINANCE = {
 
 Ships with `FINANCE`, `HEALTH`, and `SUPPORT` examples. Override any message via `rules.messages`.
 
+Rules are **validated at call time**: `staleDays`, `minRecords`, and
+`qualityThreshold` are required finite numbers, and both ports throw the same
+clear error naming the offending field. An incomplete ruleset can never
+silently pass (previously the JS port treated missing fields as permissive —
+everything looked fresh — while Python raised a bare `KeyError`).
+
 ## Decision log — an audit trail for every gate call
 
 AI answers today come with references, but no **proof**: nothing shows the
@@ -113,6 +119,94 @@ Digests are FNV-1a 64 over canonical JSON — deterministic and identical across
 the JS and Python ports (not cryptographic; they detect drift, not adversaries).
 See `examples/decision-log.mjs` for the full flow.
 
+## Provenance — prove where the evidence came from
+
+Each record can opt in to a `provenance` block answering the three questions
+an auditor asks: where did this come from, what happened to it on the way
+here, and is it the same bytes it claims to be?
+
+```js
+{ date: "2026-03-31", qualityScore: 92,
+  provenance: {
+    source: { id: "sec-edgar", type: "filing", authority: "official" }, // authority: official > licensed > secondary > unverified
+    retrievedAt: "2026-06-30T08:12:00Z",
+    contentHash: "sha256:ab12…",       // hash of the RAW artifact — YOUR app computes it (node:crypto / hashlib)
+    chain: [                           // transform lineage, hash-linked
+      { step: "parse-xbrl", tool: "edgar-parser@2.1", inputHash: "sha256:ab12…", outputHash: "sha256:cd34…" },
+    ] } }
+```
+
+The core never computes hashes — they're opaque strings, and the chain is
+verifiable by construction: `validateProvenance(record)` checks that
+`chain[0].inputHash` equals `contentHash` and every link's input matches the
+previous link's output. Broken continuity never throws and never changes gate
+status — garbage in, caveat out.
+
+Gate integration is opt-in via `rules.provenance`:
+
+```js
+rules.provenance = { require: true, minAuthority: "licensed" };
+// → provenance_missing / provenance_untrusted / provenance_broken_chain caveats,
+//   plus a provenance_attribution caveat naming the source(s):
+//   "financial statements are based on sec-edgar (official), retrieved 2026-06-30."
+```
+
+Provenance warnings **never change `status` or `allowedActions`** in v1 —
+they only add caveats. When a decision record is requested and any record
+carries provenance, the record gains an additive `decision.provenance` block
+(coverage counts, per-source tallies, broken-chain count, and a
+replay-verifiable digest of the provenance set). See `examples/provenance.mjs`.
+
+## The proof loop — verify the answer, not just the evidence
+
+The gate decides *whether* the model may speak. `verifyClaims` closes the
+loop: it checks whether what the model said **stands on the evidence it was
+given** — deterministically, with no model call.
+
+```
+retrieve ──► evidenceGate ──► prompt (+ citation block) ──► LLM ──► verifyClaims
+                 │ decision record                                     │ verification record
+                 └────────────── same evidence digest links both ──────┘
+```
+
+The core can't judge semantic truth, so it verifies a **citation protocol**:
+
+1. `citationBlock(records)` renders the markers the model must cite from —
+   `[ev:1]`, `[ev:2]`, or `[ev:acme-q1]` if a record has an `id` (ids must
+   not be purely numeric; numbers are reserved for index references).
+2. Every citation in the answer must resolve to a record that exists —
+   **no phantom evidence**.
+3. Every claim-looking sentence (digits, `%`/currency symbols — patterns
+   overridable via `rules.verification.claimPatterns`) must carry a valid
+   citation — **no naked claims**.
+4. The framing must match the gate's verdict — **no "as of today" over
+   stale data** (pass the gate result in).
+
+```js
+import { evidenceGate, verifyClaims, citationBlock, presets } from "evidence-gate";
+
+const gate = evidenceGate({ records, rules: presets.FINANCE, decision: { id: "req-9" } });
+const prompt = [sys, ...gate.caveats.map(c => "- " + c), citationBlock(records), question].join("\n");
+const answer = await llm(prompt);
+
+const v = verifyClaims({ answer, records, gate, decision: { id: "req-9" } });
+// v.verdict: "supported" | "unsupported_claims" | "no_citations" | "phantom_citations"
+if (!v.pass) retryWith(v.caveats); // or ship with a disclosure footer
+```
+
+Strict by default: `pass` is `true` only when **every** claim is cited
+(`rules.verification.requireFullCoverage: false` to loosen). An answer with
+no claims at all — a refusal — passes: refusing correctly must survive the
+loop. Supporting records are citable too, but tagged `tier: "supporting"` in
+`v.citations` so strict apps can reject them.
+
+With `decision` opted in, the verification record
+(`evidence-gate.verification/1`) joins the gate's decision record on the
+request id **and** on an identical evidence digest — so for every answer your
+log can prove which evidence was allowed and what the model did with it,
+without storing the evidence or the answer. See `examples/verified-loop.mjs`
+for the full loop.
+
 ## Use it as an MCP server
 
 Give an agent a fact-checker it calls before it speaks. The package ships an MCP server exposing a `check_evidence` tool, so any MCP-compatible agent (Claude, IDE assistants, etc.) can gate itself.
@@ -131,11 +225,16 @@ Register it with your client:
 }
 ```
 
-The tool accepts `{ records, supporting?, preset?, rules? }` and returns the gate result. Instruct your agent to call it first and refuse to answer when `allowedActions.summarize` is `false`.
+The tool accepts `{ records, supporting?, preset?, rules?, decision? }` and returns the gate result. Instruct your agent to call it first and refuse to answer when `allowedActions.summarize` is `false`.
+
+Pass `decision: true` (or `decision: { id, at }`) to get the same audit-trail
+decision record as the library API, inside the tool result — so gate calls made
+through MCP are just as provable as direct ones. Persisting the record is the
+caller's job, same as the library.
 
 ## Why trust it
 
-The engine is intentionally small and pure — no network, no dependencies, all logic unit-tested. It runs in production today inside [DaddyInvestor](https://daddyinvestor.net), a Thai-language financial-data application, gating an LLM over real, messy, sometimes-missing SEC filings.
+The engine is intentionally small and pure — no network, no dependencies, all logic unit-tested. The JS and Python ports are locked together by a shared vector file (`test/vectors.json`) that both test suites run — statuses, warning order, prompt caveats, and evidence digests must match byte-for-byte, so the audit trail cannot drift between ports. It runs in production today inside [DaddyInvestor](https://daddyinvestor.net), a Thai-language financial-data application, gating an LLM over real, messy, sometimes-missing SEC filings.
 
 ## License
 

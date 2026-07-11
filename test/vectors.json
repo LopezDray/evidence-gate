@@ -1,0 +1,974 @@
+{
+  "schema": "evidence-gate.test-vectors/1",
+  "comment": [
+    "Shared cross-port test vectors. Loaded by BOTH test/vectors.test.mjs (JS)",
+    "and python/tests/test_core.py (Python). Records/rules/expectations are",
+    "written in the JS port's camelCase convention; the Python harness maps",
+    "keys via its KEY_MAP (staleDays -> stale_days, qualityScore ->",
+    "quality_score, ...). Every `evidenceDigest` expectation uses only",
+    "port-neutral record keys (date/tier/flags/quality), so the digest MUST",
+    "be byte-identical across the two ports. Do not edit expected values to",
+    "make a port pass — a mismatch here means the ports have diverged."
+  ],
+  "fnv1a64": [
+    { "input": "", "expected": "cbf29ce484222325" },
+    { "input": "a", "expected": "af63dc4c8601ec8c" },
+    { "input": "foobar", "expected": "85944171f73967e8" },
+    { "input": "สวัสดี", "expected": "3e0dcf56d00e781a" }
+  ],
+  "canonicalJson": [
+    {
+      "name": "sorted-keys-unicode-kept",
+      "value": { "b": 2, "a": [1, "é", true], "z": null },
+      "expected": "{\"a\":[1,\"é\",true],\"b\":2,\"z\":null}"
+    },
+    {
+      "name": "nested-object-thai-float",
+      "value": { "z": { "b": 1, "a": [true, false, null] }, "k": "สวัสดี", "n": 1.5 },
+      "expected": "{\"k\":\"สวัสดี\",\"n\":1.5,\"z\":{\"a\":[true,false,null],\"b\":1}}"
+    },
+    { "name": "empty-object", "value": {}, "expected": "{}" },
+    { "name": "empty-array", "value": [], "expected": "[]" },
+    { "name": "plain-array", "value": [1, 2, 3], "expected": "[1,2,3]" }
+  ],
+  "digest": [
+    {
+      "name": "shared-reference-object",
+      "value": { "b": 2, "a": [1, "é", true], "z": null },
+      "expected": "fnv1a64:2a4b821432ab8bcc"
+    },
+    {
+      "name": "nested-object-thai-float",
+      "value": { "z": { "b": 1, "a": [true, false, null] }, "k": "สวัสดี", "n": 1.5 },
+      "expected": "fnv1a64:8cc778cdb3a6aad9"
+    },
+    { "name": "empty-object", "value": {}, "expected": "fnv1a64:08f44b07b5901a25" },
+    { "name": "plain-array", "value": [1, 2, 3], "expected": "fnv1a64:28bbee4398699f19" },
+    {
+      "name": "empty-evidence-set",
+      "value": { "records": [], "supporting": [] },
+      "expected": "fnv1a64:b154377d61167670"
+    }
+  ],
+  "gate": [
+    {
+      "name": "missing-no-records",
+      "records": [],
+      "supporting": [],
+      "rules": {
+        "primaryLabel": "test data",
+        "staleDays": 1000000,
+        "minRecords": 4,
+        "qualityThreshold": 70,
+        "forbiddenActions": ["personalized_advice", "claim_realtime"]
+      },
+      "expected": {
+        "status": "missing",
+        "freshness": "unknown",
+        "allowedActions": {
+          "summarize": false,
+          "compare": false,
+          "personalized_advice": false,
+          "claim_realtime": false
+        },
+        "warnings": [
+          { "level": "block", "code": "primary_missing" },
+          { "level": "info", "code": "no_supporting" }
+        ],
+        "caveats": [
+          "No test data available — the AI must not invent numbers.",
+          "No supporting evidence — primary source only."
+        ],
+        "evidenceDigest": "fnv1a64:b154377d61167670"
+      }
+    },
+    {
+      "name": "missing-with-supporting",
+      "records": [],
+      "supporting": [{ "date": "2026-01-01" }],
+      "rules": {
+        "primaryLabel": "test data",
+        "staleDays": 1000000,
+        "minRecords": 4,
+        "qualityThreshold": 70,
+        "forbiddenActions": ["personalized_advice", "claim_realtime"]
+      },
+      "expected": {
+        "status": "missing",
+        "freshness": "unknown",
+        "allowedActions": {
+          "summarize": true,
+          "compare": false,
+          "personalized_advice": false,
+          "claim_realtime": false
+        },
+        "warnings": [{ "level": "block", "code": "primary_missing" }],
+        "caveats": ["No test data available — the AI must not invent numbers."],
+        "evidenceDigest": "fnv1a64:7255c3f76512adc2"
+      }
+    },
+    {
+      "name": "available-fresh",
+      "records": [
+        { "date": "2026-03-01", "qualityScore": 95 },
+        { "date": "2026-03-02", "qualityScore": 95 },
+        { "date": "2026-03-03", "qualityScore": 95 },
+        { "date": "2026-03-04", "qualityScore": 95 }
+      ],
+      "supporting": [],
+      "rules": {
+        "primaryLabel": "test data",
+        "staleDays": 1000000,
+        "minRecords": 4,
+        "qualityThreshold": 70,
+        "forbiddenActions": ["personalized_advice", "claim_realtime"]
+      },
+      "expected": {
+        "status": "available",
+        "freshness": "fresh",
+        "allowedActions": {
+          "summarize": true,
+          "compare": true,
+          "personalized_advice": false,
+          "claim_realtime": false
+        },
+        "warnings": [{ "level": "info", "code": "no_supporting" }],
+        "caveats": ["No supporting evidence — primary source only."]
+      }
+    },
+    {
+      "name": "quality-warning-few-records",
+      "records": [
+        { "date": "2026-03-01", "qualityScore": 95 },
+        { "date": "2026-03-02", "qualityScore": 95 }
+      ],
+      "supporting": [],
+      "rules": {
+        "primaryLabel": "test data",
+        "staleDays": 1000000,
+        "minRecords": 4,
+        "qualityThreshold": 70,
+        "forbiddenActions": []
+      },
+      "expected": {
+        "status": "quality_warning",
+        "freshness": "fresh",
+        "allowedActions": { "summarize": true, "compare": true },
+        "warnings": [
+          { "level": "review", "code": "primary_quality" },
+          { "level": "info", "code": "no_supporting" }
+        ]
+      }
+    },
+    {
+      "name": "quality-warning-low-score",
+      "records": [
+        { "date": "2026-03-01", "qualityScore": 95 },
+        { "date": "2026-03-02", "qualityScore": 95 },
+        { "date": "2026-03-03", "qualityScore": 95 },
+        { "date": "2026-03-04", "qualityScore": 40 }
+      ],
+      "supporting": [],
+      "rules": {
+        "primaryLabel": "test data",
+        "staleDays": 1000000,
+        "minRecords": 4,
+        "qualityThreshold": 70,
+        "forbiddenActions": []
+      },
+      "expected": {
+        "status": "quality_warning",
+        "freshness": "fresh",
+        "allowedActions": { "summarize": true, "compare": true },
+        "warnings": [
+          { "level": "review", "code": "primary_quality" },
+          { "level": "info", "code": "no_supporting" }
+        ]
+      }
+    },
+    {
+      "name": "quality-warning-flag",
+      "records": [
+        { "date": "2026-03-01" },
+        { "date": "2026-03-02" },
+        { "date": "2026-03-03" },
+        { "date": "2026-03-04", "flags": ["RESTATED"] }
+      ],
+      "supporting": [],
+      "rules": {
+        "primaryLabel": "test data",
+        "staleDays": 1000000,
+        "minRecords": 4,
+        "qualityThreshold": 70,
+        "forbiddenActions": []
+      },
+      "expected": {
+        "status": "quality_warning",
+        "freshness": "fresh",
+        "allowedActions": { "summarize": true, "compare": true },
+        "warnings": [
+          { "level": "review", "code": "primary_quality" },
+          { "level": "info", "code": "no_supporting" }
+        ],
+        "evidenceDigest": "fnv1a64:2338f53058e7e9af"
+      }
+    },
+    {
+      "name": "quality-warning-review",
+      "records": [{ "date": "2026-03-01", "quality": "review" }],
+      "supporting": [],
+      "rules": {
+        "primaryLabel": "test data",
+        "staleDays": 1000000,
+        "minRecords": 1,
+        "qualityThreshold": 70,
+        "forbiddenActions": []
+      },
+      "expected": {
+        "status": "quality_warning",
+        "freshness": "fresh",
+        "allowedActions": { "summarize": true, "compare": true },
+        "warnings": [
+          { "level": "review", "code": "primary_quality" },
+          { "level": "info", "code": "no_supporting" }
+        ],
+        "evidenceDigest": "fnv1a64:30cef2c8efbdb6cf"
+      }
+    },
+    {
+      "name": "fallback-all",
+      "records": [
+        { "date": "2026-01-01", "tier": "fallback" },
+        { "date": "2026-01-02", "tier": "fallback" }
+      ],
+      "supporting": [],
+      "rules": {
+        "primaryLabel": "test data",
+        "staleDays": 1000000,
+        "minRecords": 4,
+        "qualityThreshold": 70,
+        "forbiddenActions": []
+      },
+      "expected": {
+        "status": "fallback",
+        "freshness": "fresh",
+        "allowedActions": { "summarize": true, "compare": false },
+        "warnings": [
+          { "level": "review", "code": "primary_fallback" },
+          { "level": "info", "code": "no_supporting" }
+        ],
+        "evidenceDigest": "fnv1a64:feaa0771a8725a0b"
+      }
+    },
+    {
+      "name": "stale-available",
+      "records": [
+        { "date": "2000-01-01" },
+        { "date": "2000-01-02" },
+        { "date": "2000-01-03" },
+        { "date": "2000-01-04" }
+      ],
+      "supporting": [],
+      "rules": {
+        "primaryLabel": "test data",
+        "staleDays": 30,
+        "minRecords": 4,
+        "qualityThreshold": 70,
+        "forbiddenActions": []
+      },
+      "expected": {
+        "status": "available",
+        "freshness": "stale",
+        "allowedActions": { "summarize": true, "compare": true },
+        "warnings": [
+          { "level": "review", "code": "primary_stale" },
+          { "level": "info", "code": "no_supporting" }
+        ],
+        "caveats": [
+          "test data is stale (older than 30 days) — the AI must not say \"latest\" or \"today\".",
+          "No supporting evidence — primary source only."
+        ],
+        "evidenceDigest": "fnv1a64:e8133a78a3353a72"
+      }
+    },
+    {
+      "name": "unknown-freshness",
+      "records": [{ "date": "not-a-date" }],
+      "supporting": [],
+      "rules": {
+        "primaryLabel": "test data",
+        "staleDays": 30,
+        "minRecords": 1,
+        "qualityThreshold": 70,
+        "forbiddenActions": []
+      },
+      "expected": {
+        "status": "available",
+        "freshness": "unknown",
+        "allowedActions": { "summarize": true, "compare": true },
+        "warnings": [{ "level": "info", "code": "no_supporting" }],
+        "evidenceDigest": "fnv1a64:db03b9073634e960"
+      }
+    },
+    {
+      "name": "provenance-attribution-single-source",
+      "records": [
+        { "date": "2026-03-01", "provenance": { "source": { "id": "sec-edgar", "type": "filing", "authority": "official" } } },
+        { "date": "2026-03-02", "provenance": { "source": { "id": "sec-edgar", "type": "filing", "authority": "official" } } }
+      ],
+      "supporting": [],
+      "rules": {
+        "primaryLabel": "test data",
+        "staleDays": 1000000,
+        "minRecords": 1,
+        "qualityThreshold": 70,
+        "forbiddenActions": [],
+        "provenance": {}
+      },
+      "expected": {
+        "status": "available",
+        "freshness": "fresh",
+        "allowedActions": { "summarize": true, "compare": true },
+        "warnings": [
+          { "level": "info", "code": "no_supporting" },
+          { "level": "info", "code": "provenance_attribution" }
+        ],
+        "caveats": [
+          "No supporting evidence — primary source only.",
+          "test data are based on sec-edgar (official)."
+        ],
+        "provenance": {
+          "covered": 2,
+          "total": 2,
+          "sources": [{ "id": "sec-edgar", "type": "filing", "authority": "official", "records": 2 }],
+          "brokenChains": 0,
+          "digest": "fnv1a64:c177c928b6db10e9"
+        }
+      }
+    },
+    {
+      "name": "provenance-attribution-two-sources",
+      "records": [
+        { "date": "2026-03-01", "provenance": { "source": { "id": "sec-edgar", "type": "filing", "authority": "official" } } },
+        { "date": "2026-03-02", "provenance": { "source": { "id": "help-center", "type": "document", "authority": "secondary" } } }
+      ],
+      "supporting": [],
+      "rules": {
+        "primaryLabel": "test data",
+        "staleDays": 1000000,
+        "minRecords": 1,
+        "qualityThreshold": 70,
+        "forbiddenActions": [],
+        "provenance": {}
+      },
+      "expected": {
+        "status": "available",
+        "freshness": "fresh",
+        "allowedActions": { "summarize": true, "compare": true },
+        "warnings": [
+          { "level": "info", "code": "no_supporting" },
+          { "level": "info", "code": "provenance_attribution" }
+        ],
+        "caveats": [
+          "No supporting evidence — primary source only.",
+          "test data are based on sec-edgar (official) and help-center (secondary)."
+        ],
+        "provenance": {
+          "covered": 2,
+          "total": 2,
+          "sources": [
+            { "id": "sec-edgar", "type": "filing", "authority": "official", "records": 1 },
+            { "id": "help-center", "type": "document", "authority": "secondary", "records": 1 }
+          ],
+          "brokenChains": 0,
+          "digest": "fnv1a64:218152cd76191b96"
+        }
+      }
+    },
+    {
+      "name": "provenance-attribution-silent-three-sources",
+      "records": [
+        { "date": "2026-03-01", "provenance": { "source": { "id": "sec-edgar", "type": "filing", "authority": "official" } } },
+        { "date": "2026-03-02", "provenance": { "source": { "id": "help-center", "type": "document", "authority": "secondary" } } },
+        { "date": "2026-03-03", "provenance": { "source": { "id": "vendor-x", "type": "api", "authority": "licensed" } } }
+      ],
+      "supporting": [],
+      "rules": {
+        "primaryLabel": "test data",
+        "staleDays": 1000000,
+        "minRecords": 1,
+        "qualityThreshold": 70,
+        "forbiddenActions": [],
+        "provenance": {}
+      },
+      "expected": {
+        "status": "available",
+        "freshness": "fresh",
+        "allowedActions": { "summarize": true, "compare": true },
+        "warnings": [{ "level": "info", "code": "no_supporting" }],
+        "provenance": {
+          "covered": 3,
+          "total": 3,
+          "sources": [
+            { "id": "sec-edgar", "type": "filing", "authority": "official", "records": 1 },
+            { "id": "help-center", "type": "document", "authority": "secondary", "records": 1 },
+            { "id": "vendor-x", "type": "api", "authority": "licensed", "records": 1 }
+          ],
+          "brokenChains": 0,
+          "digest": "fnv1a64:3f17c3d9e1c74af3"
+        }
+      }
+    },
+    {
+      "name": "provenance-require-missing",
+      "records": [
+        { "date": "2026-03-01", "provenance": { "source": { "id": "sec-edgar", "type": "filing", "authority": "official" } } },
+        { "date": "2026-03-02" }
+      ],
+      "supporting": [],
+      "rules": {
+        "primaryLabel": "test data",
+        "staleDays": 1000000,
+        "minRecords": 1,
+        "qualityThreshold": 70,
+        "forbiddenActions": [],
+        "provenance": { "require": true }
+      },
+      "expected": {
+        "status": "available",
+        "freshness": "fresh",
+        "allowedActions": { "summarize": true, "compare": true },
+        "warnings": [
+          { "level": "review", "code": "provenance_missing" },
+          { "level": "info", "code": "no_supporting" },
+          { "level": "info", "code": "provenance_attribution" }
+        ],
+        "caveats": [
+          "1 of 2 record(s) lack provenance — the AI must not present them as verified sources.",
+          "No supporting evidence — primary source only.",
+          "test data are based on sec-edgar (official)."
+        ],
+        "provenance": {
+          "covered": 1,
+          "total": 2,
+          "sources": [{ "id": "sec-edgar", "type": "filing", "authority": "official", "records": 1 }],
+          "brokenChains": 0,
+          "digest": "fnv1a64:7f6b29a31769ff9b"
+        }
+      }
+    },
+    {
+      "name": "provenance-min-authority-untrusted",
+      "records": [
+        { "date": "2026-03-01", "provenance": { "source": { "id": "sec-edgar", "type": "filing", "authority": "official" } } },
+        { "date": "2026-03-02", "provenance": { "source": { "id": "help-center", "type": "document", "authority": "secondary" } } }
+      ],
+      "supporting": [],
+      "rules": {
+        "primaryLabel": "test data",
+        "staleDays": 1000000,
+        "minRecords": 1,
+        "qualityThreshold": 70,
+        "forbiddenActions": [],
+        "provenance": { "minAuthority": "official" }
+      },
+      "expected": {
+        "status": "available",
+        "freshness": "fresh",
+        "allowedActions": { "summarize": true, "compare": true },
+        "warnings": [
+          { "level": "review", "code": "provenance_untrusted" },
+          { "level": "info", "code": "no_supporting" },
+          { "level": "info", "code": "provenance_attribution" }
+        ],
+        "caveats": [
+          "1 record(s) come from sources below \"official\" authority — the AI must attribute them cautiously.",
+          "No supporting evidence — primary source only.",
+          "test data are based on sec-edgar (official) and help-center (secondary)."
+        ]
+      }
+    },
+    {
+      "name": "provenance-broken-chain",
+      "records": [
+        {
+          "date": "2026-03-01",
+          "provenance": {
+            "source": { "id": "sec-edgar", "type": "filing", "authority": "official" },
+            "contentHash": "sha256:aaaa",
+            "chain": [
+              { "step": "parse", "tool": "p@1", "inputHash": "sha256:aaaa", "outputHash": "sha256:bbbb" },
+              { "step": "normalize", "tool": "n@1", "inputHash": "sha256:XXXX", "outputHash": "sha256:cccc" }
+            ]
+          }
+        }
+      ],
+      "supporting": [],
+      "rules": {
+        "primaryLabel": "test data",
+        "staleDays": 1000000,
+        "minRecords": 1,
+        "qualityThreshold": 70,
+        "forbiddenActions": [],
+        "provenance": {}
+      },
+      "expected": {
+        "status": "available",
+        "freshness": "fresh",
+        "allowedActions": { "summarize": true, "compare": true },
+        "warnings": [
+          { "level": "review", "code": "provenance_broken_chain" },
+          { "level": "info", "code": "no_supporting" },
+          { "level": "info", "code": "provenance_attribution" }
+        ],
+        "caveats": [
+          "1 record(s) have a broken provenance chain — their lineage is not replay-verifiable.",
+          "No supporting evidence — primary source only.",
+          "test data are based on sec-edgar (official)."
+        ],
+        "provenance": {
+          "covered": 1,
+          "total": 1,
+          "sources": [{ "id": "sec-edgar", "type": "filing", "authority": "official", "records": 1 }],
+          "brokenChains": 1
+        }
+      }
+    },
+    {
+      "name": "provenance-silent-without-rules",
+      "records": [
+        { "date": "2026-03-01", "provenance": { "source": { "id": "help-center", "type": "document", "authority": "secondary" } } }
+      ],
+      "supporting": [],
+      "rules": {
+        "primaryLabel": "test data",
+        "staleDays": 1000000,
+        "minRecords": 1,
+        "qualityThreshold": 70,
+        "forbiddenActions": []
+      },
+      "expected": {
+        "status": "available",
+        "freshness": "fresh",
+        "allowedActions": { "summarize": true, "compare": true },
+        "warnings": [{ "level": "info", "code": "no_supporting" }],
+        "provenance": {
+          "covered": 1,
+          "total": 1,
+          "sources": [{ "id": "help-center", "type": "document", "authority": "secondary", "records": 1 }],
+          "brokenChains": 0,
+          "digest": "fnv1a64:e91368014a68529c"
+        }
+      }
+    },
+    {
+      "name": "custom-message-override",
+      "records": [],
+      "supporting": [],
+      "rules": {
+        "staleDays": 30,
+        "minRecords": 1,
+        "qualityThreshold": 70,
+        "messages": { "primary_missing": "CUSTOM: nothing to see" }
+      },
+      "expected": {
+        "status": "missing",
+        "freshness": "unknown",
+        "allowedActions": { "summarize": false, "compare": false },
+        "warnings": [
+          { "level": "block", "code": "primary_missing" },
+          { "level": "info", "code": "no_supporting" }
+        ],
+        "caveats": [
+          "CUSTOM: nothing to see",
+          "No supporting evidence — primary source only."
+        ],
+        "evidenceDigest": "fnv1a64:b154377d61167670"
+      }
+    }
+  ],
+  "validateProvenance": [
+    { "name": "no-provenance", "record": { "date": "2026-01-01" }, "expected": { "valid": true, "problems": [] } },
+    {
+      "name": "minimal-valid",
+      "record": { "provenance": { "source": { "id": "sec-edgar", "type": "filing", "authority": "official" } } },
+      "expected": { "valid": true, "problems": [] }
+    },
+    {
+      "name": "missing-source",
+      "record": { "provenance": { "retrievedAt": "2026-06-30T08:12:00Z" } },
+      "expected": { "valid": false, "problems": ["missing_source"] }
+    },
+    {
+      "name": "good-chain",
+      "record": {
+        "provenance": {
+          "source": { "id": "s" },
+          "contentHash": "sha256:aa",
+          "chain": [
+            { "step": "a", "inputHash": "sha256:aa", "outputHash": "sha256:bb" },
+            { "step": "b", "inputHash": "sha256:bb", "outputHash": "sha256:cc" }
+          ]
+        }
+      },
+      "expected": { "valid": true, "problems": [] }
+    },
+    {
+      "name": "root-mismatch",
+      "record": {
+        "provenance": {
+          "source": { "id": "s" },
+          "contentHash": "sha256:aa",
+          "chain": [{ "step": "a", "inputHash": "sha256:ZZ", "outputHash": "sha256:bb" }]
+        }
+      },
+      "expected": { "valid": false, "problems": ["chain_root_mismatch"] }
+    },
+    {
+      "name": "chain-without-content-hash",
+      "record": {
+        "provenance": {
+          "source": { "id": "s" },
+          "chain": [{ "step": "a", "inputHash": "sha256:aa", "outputHash": "sha256:bb" }]
+        }
+      },
+      "expected": { "valid": false, "problems": ["chain_root_mismatch"] }
+    },
+    {
+      "name": "gap-at-1-and-2",
+      "record": {
+        "provenance": {
+          "source": { "id": "s" },
+          "contentHash": "sha256:aa",
+          "chain": [
+            { "step": "a", "inputHash": "sha256:aa", "outputHash": "sha256:bb" },
+            { "step": "b", "inputHash": "sha256:XX", "outputHash": "sha256:cc" },
+            { "step": "c", "inputHash": "sha256:YY", "outputHash": "sha256:dd" }
+          ]
+        }
+      },
+      "expected": { "valid": false, "problems": ["chain_gap_at_1", "chain_gap_at_2"] }
+    },
+    {
+      "name": "invalid-provenance",
+      "record": { "provenance": "not-an-object" },
+      "expected": { "valid": false, "problems": ["invalid_provenance"] }
+    }
+  ],
+  "citationBlock": [
+    {
+      "name": "full-block-ids-flags-supporting",
+      "records": [
+        { "date": "2026-03-31", "qualityScore": 92 },
+        { "date": "2025-12-31", "qualityScore": 90 },
+        { "date": "2025-09-30", "qualityScore": 91, "flags": ["RESTATED"], "id": "q3-2025" },
+        { "id": "42" }
+      ],
+      "supporting": [{ "date": "2026-01-15" }],
+      "expected": "EVIDENCE (cite with its marker after every factual statement):\n[ev:1] 2026-03-31 — quality 92\n[ev:2] 2025-12-31 — quality 90\n[ev:q3-2025] 2025-09-30 — quality 91, flags: RESTATED\n[ev:4] undated\n[ev:5] 2026-01-15 (supporting)"
+    }
+  ],
+  "verify": [
+    {
+      "name": "supported-all-cited",
+      "answer": "Revenue was 1.2M in Q1 [ev:1]. Margins held at 30% [ev:q3-2025].",
+      "records": [
+        { "date": "2026-03-31" },
+        { "date": "2025-12-31" },
+        { "date": "2025-09-30", "id": "q3-2025" }
+      ],
+      "expected": {
+        "pass": true,
+        "verdict": "supported",
+        "citations": [
+          { "marker": "ev:1", "ref": "1", "record": 0, "valid": true, "tier": "primary" },
+          { "marker": "ev:q3-2025", "ref": "q3-2025", "record": 2, "valid": true, "tier": "primary" }
+        ],
+        "claims": [
+          { "text": "Revenue was 1.2M in Q1 [ev:1].", "cited": true, "markers": ["ev:1"] },
+          { "text": "Margins held at 30% [ev:q3-2025].", "cited": true, "markers": ["ev:q3-2025"] }
+        ],
+        "stats": { "claims": 2, "cited": 2, "uncited": 0, "phantom": 0 },
+        "warnings": [],
+        "caveats": [],
+        "evidenceDigest": "fnv1a64:eb589402b1d9eb95",
+        "answerDigest": "fnv1a64:16ea2e79329bdde1"
+      }
+    },
+    {
+      "name": "phantom-citation",
+      "answer": "Revenue was 1.2M in Q1 [ev:1]. Growth vs Q4 was 8% [ev:9].",
+      "records": [
+        { "date": "2026-03-31" },
+        { "date": "2025-12-31" },
+        { "date": "2025-09-30", "id": "q3-2025" }
+      ],
+      "expected": {
+        "pass": false,
+        "verdict": "phantom_citations",
+        "citations": [
+          { "marker": "ev:1", "ref": "1", "record": 0, "valid": true, "tier": "primary" },
+          { "marker": "ev:9", "ref": "9", "record": null, "valid": false, "tier": null }
+        ],
+        "claims": [
+          { "text": "Revenue was 1.2M in Q1 [ev:1].", "cited": true, "markers": ["ev:1"] },
+          { "text": "Growth vs Q4 was 8% [ev:9].", "cited": false, "markers": ["ev:9"] }
+        ],
+        "stats": { "claims": 2, "cited": 1, "uncited": 1, "phantom": 1 },
+        "warnings": [
+          { "level": "block", "code": "verify_phantom_citation" },
+          { "level": "review", "code": "verify_uncited_claim" }
+        ],
+        "caveats": [
+          "Citations resolve to no evidence record: [ev:9] — the model may have invented sources.",
+          "1 claim(s) lack a valid citation — treat them as unverified."
+        ],
+        "answerDigest": "fnv1a64:a859c706a29633f8"
+      }
+    },
+    {
+      "name": "no-citations",
+      "answer": "Revenue was 1.2M. Growth was 8%.",
+      "records": [
+        { "date": "2026-03-31" },
+        { "date": "2025-12-31" },
+        { "date": "2025-09-30", "id": "q3-2025" }
+      ],
+      "expected": {
+        "pass": false,
+        "verdict": "no_citations",
+        "citations": [],
+        "claims": [
+          { "text": "Revenue was 1.2M.", "cited": false, "markers": [] },
+          { "text": "Growth was 8%.", "cited": false, "markers": [] }
+        ],
+        "stats": { "claims": 2, "cited": 0, "uncited": 2, "phantom": 0 },
+        "warnings": [{ "level": "block", "code": "verify_no_citations" }],
+        "caveats": ["The answer makes claims but cites no evidence — the citation protocol was ignored."]
+      }
+    },
+    {
+      "name": "unsupported-claims-strict-default",
+      "answer": "Revenue was 1.2M [ev:1]. Growth was 8%.",
+      "records": [
+        { "date": "2026-03-31" },
+        { "date": "2025-12-31" },
+        { "date": "2025-09-30", "id": "q3-2025" }
+      ],
+      "expected": {
+        "pass": false,
+        "verdict": "unsupported_claims",
+        "citations": [{ "marker": "ev:1", "ref": "1", "record": 0, "valid": true, "tier": "primary" }],
+        "claims": [
+          { "text": "Revenue was 1.2M [ev:1].", "cited": true, "markers": ["ev:1"] },
+          { "text": "Growth was 8%.", "cited": false, "markers": [] }
+        ],
+        "stats": { "claims": 2, "cited": 1, "uncited": 1, "phantom": 0 },
+        "warnings": [{ "level": "review", "code": "verify_uncited_claim" }],
+        "caveats": ["1 claim(s) lack a valid citation — treat them as unverified."]
+      }
+    },
+    {
+      "name": "unsupported-claims-lenient",
+      "answer": "Revenue was 1.2M [ev:1]. Growth was 8%.",
+      "records": [
+        { "date": "2026-03-31" },
+        { "date": "2025-12-31" },
+        { "date": "2025-09-30", "id": "q3-2025" }
+      ],
+      "rules": { "verification": { "requireFullCoverage": false } },
+      "expected": {
+        "pass": true,
+        "verdict": "unsupported_claims",
+        "stats": { "claims": 2, "cited": 1, "uncited": 1, "phantom": 0 },
+        "warnings": [{ "level": "review", "code": "verify_uncited_claim" }]
+      }
+    },
+    {
+      "name": "refusal-no-claims-passes",
+      "answer": "I don't have enough evidence to answer that.",
+      "records": [
+        { "date": "2026-03-31" },
+        { "date": "2025-12-31" },
+        { "date": "2025-09-30", "id": "q3-2025" }
+      ],
+      "expected": {
+        "pass": true,
+        "verdict": "supported",
+        "citations": [],
+        "claims": [],
+        "stats": { "claims": 0, "cited": 0, "uncited": 0, "phantom": 0 },
+        "warnings": [],
+        "caveats": [],
+        "answerDigest": "fnv1a64:76ce403a1cd49429"
+      }
+    },
+    {
+      "name": "stale-framing",
+      "answer": "As of today, revenue is 1.2M [ev:1].",
+      "records": [
+        { "date": "2026-03-31" },
+        { "date": "2025-12-31" },
+        { "date": "2025-09-30", "id": "q3-2025" }
+      ],
+      "gate": { "freshness": "stale" },
+      "expected": {
+        "pass": true,
+        "verdict": "supported",
+        "stats": { "claims": 1, "cited": 1, "uncited": 0, "phantom": 0 },
+        "warnings": [{ "level": "review", "code": "verify_stale_framing" }],
+        "caveats": [
+          "The answer uses fresh-sounding framing but the evidence is stale — the AI must not say \"latest\" or \"today\"."
+        ]
+      }
+    },
+    {
+      "name": "supporting-tier",
+      "answer": "Cash was 4M [ev:2].",
+      "records": [{ "date": "2026-03-31" }],
+      "supporting": [{ "date": "2026-02-28" }],
+      "expected": {
+        "pass": true,
+        "verdict": "supported",
+        "citations": [{ "marker": "ev:2", "ref": "2", "record": 1, "valid": true, "tier": "supporting" }],
+        "stats": { "claims": 1, "cited": 1, "uncited": 0, "phantom": 0 },
+        "warnings": [],
+        "evidenceDigest": "fnv1a64:4b55b6f52ef5b70f"
+      }
+    },
+    {
+      "name": "numeric-id-ignored",
+      "answer": "Revenue was 1.2M [ev:42].",
+      "records": [{ "date": "2026-03-31", "id": "42" }],
+      "expected": {
+        "pass": false,
+        "verdict": "phantom_citations",
+        "citations": [{ "marker": "ev:42", "ref": "42", "record": null, "valid": false, "tier": null }],
+        "stats": { "claims": 1, "cited": 0, "uncited": 1, "phantom": 1 },
+        "warnings": [
+          { "level": "block", "code": "verify_phantom_citation" },
+          { "level": "block", "code": "verify_no_citations" }
+        ]
+      }
+    },
+    {
+      "name": "marker-digit-is-not-a-claim",
+      "answer": "See the latest filing [ev:1].",
+      "records": [
+        { "date": "2026-03-31" },
+        { "date": "2025-12-31" },
+        { "date": "2025-09-30", "id": "q3-2025" }
+      ],
+      "expected": {
+        "pass": true,
+        "verdict": "supported",
+        "citations": [{ "marker": "ev:1", "ref": "1", "record": 0, "valid": true, "tier": "primary" }],
+        "claims": [],
+        "stats": { "claims": 0, "cited": 0, "uncited": 0, "phantom": 0 },
+        "warnings": []
+      }
+    },
+    {
+      "name": "thai-multiline-ascii-digits-only",
+      "answer": "กำไรโต 12% [ev:1]\nไม่มีข้อมูลเพิ่มเติม และตัวเลขไทย ๑๒ ไม่นับเป็น claim",
+      "records": [
+        { "date": "2026-03-31" },
+        { "date": "2025-12-31" },
+        { "date": "2025-09-30", "id": "q3-2025" }
+      ],
+      "expected": {
+        "pass": true,
+        "verdict": "supported",
+        "claims": [{ "text": "กำไรโต 12% [ev:1]", "cited": true, "markers": ["ev:1"] }],
+        "stats": { "claims": 1, "cited": 1, "uncited": 0, "phantom": 0 },
+        "warnings": [],
+        "answerDigest": "fnv1a64:2f11a77c0ae8e519"
+      }
+    },
+    {
+      "name": "custom-message-override",
+      "answer": "Revenue was 1.2M.",
+      "records": [
+        { "date": "2026-03-31" },
+        { "date": "2025-12-31" },
+        { "date": "2025-09-30", "id": "q3-2025" }
+      ],
+      "rules": { "messages": { "verify_no_citations": "CUSTOM: cite or be quiet" } },
+      "expected": {
+        "pass": false,
+        "verdict": "no_citations",
+        "stats": { "claims": 1, "cited": 0, "uncited": 1, "phantom": 0 },
+        "warnings": [{ "level": "block", "code": "verify_no_citations" }],
+        "caveats": ["CUSTOM: cite or be quiet"]
+      }
+    },
+    {
+      "name": "empty-answer",
+      "answer": "",
+      "records": [
+        { "date": "2026-03-31" },
+        { "date": "2025-12-31" },
+        { "date": "2025-09-30", "id": "q3-2025" }
+      ],
+      "expected": {
+        "pass": true,
+        "verdict": "supported",
+        "citations": [],
+        "claims": [],
+        "stats": { "claims": 0, "cited": 0, "uncited": 0, "phantom": 0 },
+        "warnings": [],
+        "answerDigest": "fnv1a64:07cc7607b4949e25"
+      }
+    }
+  ],
+  "invalidRules": [
+    { "name": "rules-null", "rules": null, "errorField": null },
+    { "name": "rules-array", "rules": [], "errorField": null },
+    { "name": "empty-rules-object", "rules": {}, "errorField": "staleDays" },
+    {
+      "name": "missing-quality-threshold",
+      "rules": { "staleDays": 30, "minRecords": 1 },
+      "errorField": "qualityThreshold"
+    },
+    {
+      "name": "number-field-as-string",
+      "rules": { "staleDays": "30", "minRecords": 1, "qualityThreshold": 50 },
+      "errorField": "staleDays"
+    },
+    {
+      "name": "number-field-as-boolean",
+      "rules": { "staleDays": 30, "minRecords": true, "qualityThreshold": 50 },
+      "errorField": "minRecords"
+    },
+    {
+      "name": "forbidden-actions-not-a-list",
+      "rules": {
+        "staleDays": 30,
+        "minRecords": 1,
+        "qualityThreshold": 50,
+        "forbiddenActions": "personalized_advice"
+      },
+      "errorField": "forbiddenActions"
+    },
+    {
+      "name": "messages-not-an-object",
+      "rules": { "staleDays": 30, "minRecords": 1, "qualityThreshold": 50, "messages": [] },
+      "errorField": "messages"
+    },
+    {
+      "name": "primary-label-not-a-string",
+      "rules": { "staleDays": 30, "minRecords": 1, "qualityThreshold": 50, "primaryLabel": 42 },
+      "errorField": "primaryLabel"
+    },
+    {
+      "name": "provenance-not-an-object",
+      "rules": { "staleDays": 30, "minRecords": 1, "qualityThreshold": 50, "provenance": "strict" },
+      "errorField": "provenance"
+    },
+    {
+      "name": "min-authority-not-in-ladder",
+      "rules": { "staleDays": 30, "minRecords": 1, "qualityThreshold": 50, "provenance": { "minAuthority": "gospel" } },
+      "errorField": "provenance.minAuthority"
+    }
+  ]
+}

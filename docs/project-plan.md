@@ -8,7 +8,7 @@
 
 ---
 
-## 0. สถานะล่าสุด (2026-07-10)
+## 0. สถานะล่าสุด (2026-07-11)
 
 | งาน | สถานะ |
 |---|---|
@@ -17,18 +17,21 @@
 | P1-1 Decision log / audit trail | ✅ เสร็จ + ซ่อม null-records crash และ align สองพอร์ต (#3) |
 | P1-2 Release v0.2.0 | ✅ เสร็จ — npm `evidence-gate@0.2.0` + PyPI `evidence-gate-py@0.2.0`, CHANGELOG, merge เข้า main, tag `v0.2.0` → `662a832` (#4) |
 | P1-4 Launch | 📝 ร่างโพสต์ Show HN / Reddit (r/LocalLLaMA, r/RAG) / X พร้อมแล้ว — รอเจ้าของโพสต์ + ตอบคอมเมนต์ 48 ชม. (#6) |
-| P3-1 Provenance — schema | ✏️ spec **approved** (#8) — พร้อม implement ตาม plan §8 |
-| P3-2 verifyClaims — API | ✏️ spec **approved** (#8) — พร้อม implement ตาม plan §11 |
-| Logic review รอบ Fable 5 | ✅ เจอ+ซ่อมบั๊ก 3 จุด, พบ divergence เดิม 1 จุด (rules validation) และช่องว่าง spec 6 ข้อ — เข้าแผนเป็น WP1/WP2 ด้านล่าง |
+| WP2 test vectors + rules validation + MCP decision | ✅ เสร็จ (2026-07-11) — `test/vectors.json` ใช้ร่วมสองพอร์ต, `validateRules`/`validate_rules` ปิด divergence JS-เงียบ vs Py-KeyError, MCP `check_evidence` รับ `decision` — commit `20001c4` |
+| P3-2 verifyClaims — claim verification | ✅ เสร็จ (2026-07-11) — `verifyClaims`/`citationBlock` + verdict ladder + `evidence-gate.verification/1` digest-join กับ decision log, `examples/verified-loop.mjs`, README "The proof loop" — commit `c9c7ae7` |
+| P3-1 Provenance | ✅ เสร็จ (2026-07-11) — `validateProvenance` chain rules + `rules.provenance` warnings + attribution caveat + `decision.provenance` block (digest replay ได้), `examples/provenance.mjs` — commit `5a7d37b` |
+| Logic review รอบ Fable 5 | ✅ เจอ+ซ่อมบั๊ก 3 จุด, พบ divergence เดิม 1 จุด (rules validation) และช่องว่าง spec 6 ข้อ — ปิดหมดแล้วใน WP2/P3-1/P3-2 (vectors จับ divergence เพิ่มได้อีก 4 จุดระหว่างทาง: Python `{}` rules falsy ×2, JS `forbiddenActions: null` crash, Python explicit-`None` optional fields) |
 
-**Phase 1 ปิดครบ (เว้น P1-4 launch ที่รอเจ้าของโพสต์)** → งานถัดไปคือ **Phase 3** ให้ session ใหม่ (Fable) วางแผน+ทำต่อ ดู [`docs/phase3-kickoff.md`](phase3-kickoff.md)
+**Phase 3 implement ครบสามงานหลักแล้ว (WP2 → P3-2 → P3-1)** — เหลือ **P3-3 release v1.0 + case study**
+(รอเจ้าของ: publish npm/PyPI + เนื้อหา case study) และ **P3-4 dashboard** (ยังไม่ถึง trigger:
+ผู้ใช้จริง ≥10 หรือมีคนขอ ≥3) — ดู [`docs/phase3-kickoff.md`](phase3-kickoff.md)
 
-**งานใหม่จากผลรีวิว (แทรกก่อน implement Phase 3):**
+**งานจากผลรีวิว (ปิดแล้ว):**
 
-| ID | งาน | Priority | Effort |
-|---|---|---|---|
-| WP1 | ปิด open questions ทั้งหมดของสอง design docs + spec gaps จากรีวิว (supporting ใน verifyClaims, provenance digest placeholder, กติกา attribution เดียว, ห้าม id ตัวเลขล้วน, 0-based index) | P0 ก่อนเริ่ม P3-1/P3-2 | 1–2 review-hrs |
-| WP2 | Shared test vectors (`test/vectors.json` ใช้ร่วมสองพอร์ต), validate rules ตอนเรียก (แก้ JS เงียบ-fresh vs Py KeyError), ส่ง `decision` ผ่าน MCP `check_evidence` | P1 | 1 AI-day / 1 review-hr |
+| ID | งาน | สถานะ |
+|---|---|---|
+| WP1 | ปิด open questions ทั้งหมดของสอง design docs + spec gaps จากรีวิว (supporting ใน verifyClaims, provenance digest placeholder, กติกา attribution เดียว, ห้าม id ตัวเลขล้วน, 0-based index) | ✅ อนุมัติใน #8 (2026-07-02) — design docs อัปเดตเป็น approved พร้อม resolutions ครบใน §12/§9 ของแต่ละ doc |
+| WP2 | Shared test vectors (`test/vectors.json` ใช้ร่วมสองพอร์ต), validate rules ตอนเรียก (แก้ JS เงียบ-fresh vs Py KeyError), ส่ง `decision` ผ่าน MCP `check_evidence` | ✅ เสร็จ — commit `20001c4` |
 
 ## 1. วิสัยทัศน์และจุดยืน
 

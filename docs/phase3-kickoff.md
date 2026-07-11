@@ -3,6 +3,14 @@
 > เอกสารส่งต่องานสำหรับเปิด session ใหม่ให้ **Fable** วางแผน + ลงมือ Phase 3
 > ("ref" → "proof"). อ่านไฟล์นี้ก่อน แล้วเริ่มตามลำดับด้านล่าง
 
+## ✅ ความคืบหน้า (2026-07-11 — session Fable บน branch `claude/phase3-wp2-verify-hy71kk`)
+
+- **WP2 เสร็จ** (`20001c4`) — shared vectors + rules validation + MCP decision
+- **P3-2 เสร็จ** (`c9c7ae7`) — `verifyClaims`/`citationBlock` + verification record + proof loop
+- **P3-1 เสร็จ** (`5a7d37b`) — `validateProvenance` + `rules.provenance` warnings + `decision.provenance`
+- เหลือ **P3-3** (release v1.0 + case study — ต้องมีเจ้าของร่วม: publish + เนื้อหา) และ
+  **P3-4** (รอ trigger) — สถานะเต็มดู [`project-plan.md`](project-plan.md) §0
+
 ## จุดที่ค้างอยู่ (ณ 2026-07-10)
 
 - **Phase 0 + Phase 1 เสร็จแล้ว**: v0.2.0 ออกทั้ง npm (`evidence-gate`) + PyPI

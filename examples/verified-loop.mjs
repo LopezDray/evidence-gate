@@ -1,0 +1,63 @@
+// Evidence Gate — the full proof loop: gate → cite → generate → verify.
+//
+//   retrieve ──► evidenceGate ──► prompt (+ citation block) ──► LLM ──► verifyClaims
+//                    │ decision record                                     │ verification record
+//                    └────────────── same evidence digest links both ──────┘
+//
+// The gate decides WHETHER the model may speak; verifyClaims checks whether
+// what it said stands on the evidence it was given: every citation must
+// resolve to a real record (no phantom evidence), every claim-looking
+// sentence must carry a citation (no naked claims), and the framing must
+// match the gate's verdict (no "as of today" over stale data).
+//
+// Run it:  node examples/verified-loop.mjs
+
+import { appendFileSync, readFileSync } from "node:fs";
+import { evidenceGate, verifyClaims, citationBlock, presets } from "../src/index.js";
+
+const LOG = new URL("./proof-loop.jsonl", import.meta.url);
+
+const records = [
+  { date: "2026-03-31", qualityScore: 92, id: "q1-2026" },
+  { date: "2025-12-31", qualityScore: 90 },
+  { date: "2025-09-30", qualityScore: 91, flags: ["RESTATED"] },
+  { date: "2025-06-30", qualityScore: 88 },
+];
+
+// ── 1. Gate: may the model speak at all? ──────────────────────────────────────
+const gate = evidenceGate({ records, rules: presets.FINANCE, decision: { id: "req-9" } });
+appendFileSync(LOG, JSON.stringify(gate.decision) + "\n");
+console.log(`gate: status=${gate.status} summarize=${gate.allowedActions.summarize}`);
+
+// ── 2. Prompt: caveats + the citation block the model must cite from ──────────
+const prompt = [
+  "Answer ONLY from the evidence below.",
+  ...gate.caveats.map((c) => "- " + c),
+  citationBlock(records),
+  "Q: How did revenue develop?",
+].join("\n");
+console.log("\n--- prompt ---\n" + prompt + "\n--------------\n");
+
+// ── 3. "LLM" answers (simulated: one good claim, one invented source) ─────────
+const answer =
+  "Revenue was 1.2M in Q1 2026 [ev:q1-2026]. Growth versus Q4 was 8% [ev:9].";
+
+// ── 4. Verify: does the answer stand on the evidence? ─────────────────────────
+const v = verifyClaims({ answer, records, gate, decision: { id: "req-9" } });
+appendFileSync(LOG, JSON.stringify(v.decision) + "\n");
+console.log(`verify: verdict=${v.verdict} pass=${v.pass}`);
+for (const w of v.warnings) console.log(`  [${w.level}] ${w.message}`);
+// → phantom_citations: [ev:9] resolves to nothing — retry with v.caveats
+//   appended to the prompt, or ship with a disclosure footer.
+
+// ── 5. The audit trail: one request id, two joined records ────────────────────
+// The gate decision says what evidence and rules were in play; the
+// verification record says what the model did with it. They join on the id
+// AND on an identical evidence digest — with neither the evidence nor the
+// answer text stored.
+const entries = readFileSync(LOG, "utf8").trim().split("\n").map(JSON.parse).slice(-2);
+const [gd, vd] = entries;
+console.log(`\naudit join for req-9:`);
+console.log(`  ${gd.schema}  evidence=${gd.digests.evidence}`);
+console.log(`  ${vd.schema}  evidence=${vd.digests.evidence}  answer=${vd.digests.answer}`);
+console.log(`  digests match: ${gd.digests.evidence === vd.digests.evidence}`);
