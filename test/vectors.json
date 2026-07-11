@@ -705,7 +705,7 @@
           { "text": "Revenue was 1.2M in Q1 [ev:1].", "cited": true, "markers": ["ev:1"] },
           { "text": "Margins held at 30% [ev:q3-2025].", "cited": true, "markers": ["ev:q3-2025"] }
         ],
-        "stats": { "claims": 2, "cited": 2, "uncited": 0, "phantom": 0 },
+        "stats": { "claims": 2, "cited": 2, "uncited": 0, "phantom": 0, "misquoted": 0 },
         "warnings": [],
         "caveats": [],
         "evidenceDigest": "fnv1a64:eb589402b1d9eb95",
@@ -731,7 +731,7 @@
           { "text": "Revenue was 1.2M in Q1 [ev:1].", "cited": true, "markers": ["ev:1"] },
           { "text": "Growth vs Q4 was 8% [ev:9].", "cited": false, "markers": ["ev:9"] }
         ],
-        "stats": { "claims": 2, "cited": 1, "uncited": 1, "phantom": 1 },
+        "stats": { "claims": 2, "cited": 1, "uncited": 1, "phantom": 1, "misquoted": 0 },
         "warnings": [
           { "level": "block", "code": "verify_phantom_citation" },
           { "level": "review", "code": "verify_uncited_claim" }
@@ -759,7 +759,7 @@
           { "text": "Revenue was 1.2M.", "cited": false, "markers": [] },
           { "text": "Growth was 8%.", "cited": false, "markers": [] }
         ],
-        "stats": { "claims": 2, "cited": 0, "uncited": 2, "phantom": 0 },
+        "stats": { "claims": 2, "cited": 0, "uncited": 2, "phantom": 0, "misquoted": 0 },
         "warnings": [{ "level": "block", "code": "verify_no_citations" }],
         "caveats": ["The answer makes claims but cites no evidence — the citation protocol was ignored."]
       }
@@ -780,7 +780,7 @@
           { "text": "Revenue was 1.2M [ev:1].", "cited": true, "markers": ["ev:1"] },
           { "text": "Growth was 8%.", "cited": false, "markers": [] }
         ],
-        "stats": { "claims": 2, "cited": 1, "uncited": 1, "phantom": 0 },
+        "stats": { "claims": 2, "cited": 1, "uncited": 1, "phantom": 0, "misquoted": 0 },
         "warnings": [{ "level": "review", "code": "verify_uncited_claim" }],
         "caveats": ["1 claim(s) lack a valid citation — treat them as unverified."]
       }
@@ -797,7 +797,7 @@
       "expected": {
         "pass": true,
         "verdict": "unsupported_claims",
-        "stats": { "claims": 2, "cited": 1, "uncited": 1, "phantom": 0 },
+        "stats": { "claims": 2, "cited": 1, "uncited": 1, "phantom": 0, "misquoted": 0 },
         "warnings": [{ "level": "review", "code": "verify_uncited_claim" }]
       }
     },
@@ -814,7 +814,7 @@
         "verdict": "supported",
         "citations": [],
         "claims": [],
-        "stats": { "claims": 0, "cited": 0, "uncited": 0, "phantom": 0 },
+        "stats": { "claims": 0, "cited": 0, "uncited": 0, "phantom": 0, "misquoted": 0 },
         "warnings": [],
         "caveats": [],
         "answerDigest": "fnv1a64:76ce403a1cd49429"
@@ -832,7 +832,7 @@
       "expected": {
         "pass": true,
         "verdict": "supported",
-        "stats": { "claims": 1, "cited": 1, "uncited": 0, "phantom": 0 },
+        "stats": { "claims": 1, "cited": 1, "uncited": 0, "phantom": 0, "misquoted": 0 },
         "warnings": [{ "level": "review", "code": "verify_stale_framing" }],
         "caveats": [
           "The answer uses fresh-sounding framing but the evidence is stale — the AI must not say \"latest\" or \"today\"."
@@ -848,7 +848,7 @@
         "pass": true,
         "verdict": "supported",
         "citations": [{ "marker": "ev:2", "ref": "2", "record": 1, "valid": true, "tier": "supporting" }],
-        "stats": { "claims": 1, "cited": 1, "uncited": 0, "phantom": 0 },
+        "stats": { "claims": 1, "cited": 1, "uncited": 0, "phantom": 0, "misquoted": 0 },
         "warnings": [],
         "evidenceDigest": "fnv1a64:4b55b6f52ef5b70f"
       }
@@ -861,7 +861,7 @@
         "pass": false,
         "verdict": "phantom_citations",
         "citations": [{ "marker": "ev:42", "ref": "42", "record": null, "valid": false, "tier": null }],
-        "stats": { "claims": 1, "cited": 0, "uncited": 1, "phantom": 1 },
+        "stats": { "claims": 1, "cited": 0, "uncited": 1, "phantom": 1, "misquoted": 0 },
         "warnings": [
           { "level": "block", "code": "verify_phantom_citation" },
           { "level": "block", "code": "verify_no_citations" }
@@ -881,12 +881,13 @@
         "verdict": "supported",
         "citations": [{ "marker": "ev:1", "ref": "1", "record": 0, "valid": true, "tier": "primary" }],
         "claims": [],
-        "stats": { "claims": 0, "cited": 0, "uncited": 0, "phantom": 0 },
+        "stats": { "claims": 0, "cited": 0, "uncited": 0, "phantom": 0, "misquoted": 0 },
         "warnings": []
       }
     },
     {
-      "name": "thai-multiline-ascii-digits-only",
+      "name": "thai-digits-count-as-claims",
+      "comment": "behavior change with design §8 (2026-07-11): [๐-๙] joined the default claim patterns, so the Thai-numeral sentence is now an uncited claim — deliberate spec'd update of the old lock, applied to both ports in the same commit",
       "answer": "กำไรโต 12% [ev:1]\nไม่มีข้อมูลเพิ่มเติม และตัวเลขไทย ๑๒ ไม่นับเป็น claim",
       "records": [
         { "date": "2026-03-31" },
@@ -894,11 +895,14 @@
         { "date": "2025-09-30", "id": "q3-2025" }
       ],
       "expected": {
-        "pass": true,
-        "verdict": "supported",
-        "claims": [{ "text": "กำไรโต 12% [ev:1]", "cited": true, "markers": ["ev:1"] }],
-        "stats": { "claims": 1, "cited": 1, "uncited": 0, "phantom": 0 },
-        "warnings": [],
+        "pass": false,
+        "verdict": "unsupported_claims",
+        "claims": [
+          { "text": "กำไรโต 12% [ev:1]", "cited": true, "markers": ["ev:1"] },
+          { "text": "ไม่มีข้อมูลเพิ่มเติม และตัวเลขไทย ๑๒ ไม่นับเป็น claim", "cited": false, "markers": [] }
+        ],
+        "stats": { "claims": 2, "cited": 1, "uncited": 1, "phantom": 0, "misquoted": 0 },
+        "warnings": [{ "level": "review", "code": "verify_uncited_claim" }],
         "answerDigest": "fnv1a64:2f11a77c0ae8e519"
       }
     },
@@ -914,7 +918,7 @@
       "expected": {
         "pass": false,
         "verdict": "no_citations",
-        "stats": { "claims": 1, "cited": 0, "uncited": 1, "phantom": 0 },
+        "stats": { "claims": 1, "cited": 0, "uncited": 1, "phantom": 0, "misquoted": 0 },
         "warnings": [{ "level": "block", "code": "verify_no_citations" }],
         "caveats": ["CUSTOM: cite or be quiet"]
       }
@@ -932,9 +936,222 @@
         "verdict": "supported",
         "citations": [],
         "claims": [],
-        "stats": { "claims": 0, "cited": 0, "uncited": 0, "phantom": 0 },
+        "stats": { "claims": 0, "cited": 0, "uncited": 0, "phantom": 0, "misquoted": 0 },
         "warnings": [],
         "answerDigest": "fnv1a64:07cc7607b4949e25"
+      }
+    },
+    {
+      "name": "fact-misquote-suffix-and-strict-count",
+      "comment": "§8 strict: 1.5M (=1500000) misses revenue, and Q1's bare 1 is checked too — both block",
+      "answer": "Revenue was 1.5M in Q1 [ev:1].",
+      "records": [{ "date": "2026-03-31", "facts": { "revenue": 1234500 } }],
+      "expected": {
+        "pass": false,
+        "verdict": "misquoted_values",
+        "misquotes": [
+          { "token": "1.5M", "value": 1500000, "sentence": "Revenue was 1.5M in Q1 [ev:1]." },
+          { "token": "1", "value": 1, "sentence": "Revenue was 1.5M in Q1 [ev:1]." }
+        ],
+        "stats": { "claims": 1, "cited": 1, "uncited": 0, "phantom": 0, "misquoted": 2 },
+        "warnings": [{ "level": "block", "code": "verify_misquoted_value" }],
+        "caveats": [
+          "Cited numbers do not match the evidence facts: 1.5M, 1 — the model may have misquoted values."
+        ],
+        "evidenceDigest": "fnv1a64:24787c2b3d55eaff",
+        "answerDigest": "fnv1a64:c5b15d0543cc29de"
+      }
+    },
+    {
+      "name": "fact-exact-separators-decimal-percent-year",
+      "comment": "§8 exact matching across shapes: thousands separators, decimal, percent-as-displayed, and a year the app chose to put in facts",
+      "answer": "รายได้ 1,234,500 บาท กำไรต่อหุ้น 0.42 และโต 8% ในปี 2026 [ev:1]",
+      "records": [
+        { "date": "2026-03-31", "facts": { "revenue": 1234500, "eps": 0.42, "growth": 8, "year": 2026 } }
+      ],
+      "expected": {
+        "pass": true,
+        "verdict": "supported",
+        "misquotes": [],
+        "stats": { "claims": 1, "cited": 1, "uncited": 0, "phantom": 0, "misquoted": 0 },
+        "warnings": [],
+        "evidenceDigest": "fnv1a64:cf4bbcb9e5e3c0bd",
+        "answerDigest": "fnv1a64:e2e69aff94509581"
+      }
+    },
+    {
+      "name": "fact-suffix-exact-no-float-multiply",
+      "comment": "locks the decimal-point-shift canonicalization: a port that computes 1.2 * 1e6 in floats gets 1199999.9999999998 and fails this",
+      "answer": "Revenue reached 1.2M [ev:1].",
+      "records": [{ "date": "2026-03-31", "facts": { "revenue": 1200000 } }],
+      "expected": {
+        "pass": true,
+        "verdict": "supported",
+        "misquotes": [],
+        "stats": { "claims": 1, "cited": 1, "uncited": 0, "phantom": 0, "misquoted": 0 },
+        "warnings": [],
+        "evidenceDigest": "fnv1a64:d2491523b6de63cd",
+        "answerDigest": "fnv1a64:7735d135f5ae2851"
+      }
+    },
+    {
+      "name": "fact-suffix-rounded-is-misquote",
+      "comment": "§8 exact-only resolution: 1.2M is 1200000 exactly, never a rounding of 1234500",
+      "answer": "Revenue was about 1.2M [ev:1].",
+      "records": [{ "date": "2026-03-31", "facts": { "revenue": 1234500 } }],
+      "expected": {
+        "pass": false,
+        "verdict": "misquoted_values",
+        "misquotes": [
+          { "token": "1.2M", "value": 1200000, "sentence": "Revenue was about 1.2M [ev:1]." }
+        ],
+        "stats": { "claims": 1, "cited": 1, "uncited": 0, "phantom": 0, "misquoted": 1 },
+        "warnings": [{ "level": "block", "code": "verify_misquoted_value" }],
+        "answerDigest": "fnv1a64:9e724a282ef6860b"
+      }
+    },
+    {
+      "name": "fact-thai-digits-and-magnitude",
+      "comment": "๑.๕ ล้าน → 1500000: Thai digit translation + Thai magnitude word, byte-identical across ports",
+      "answer": "กำไรสุทธิ ๑.๕ ล้านบาท [ev:1]",
+      "records": [{ "date": "2026-03-31", "facts": { "profit": 1500000 } }],
+      "expected": {
+        "pass": true,
+        "verdict": "supported",
+        "misquotes": [],
+        "stats": { "claims": 1, "cited": 1, "uncited": 0, "phantom": 0, "misquoted": 0 },
+        "warnings": [],
+        "evidenceDigest": "fnv1a64:dee77a7959eb790a",
+        "answerDigest": "fnv1a64:9e01023426d7fb07"
+      }
+    },
+    {
+      "name": "fact-thai-compound-magnitude",
+      "comment": "1.5 พันล้าน → 1500000000 (compound magnitude, longest-first alternation)",
+      "answer": "รายได้รวม 1.5 พันล้านบาท [ev:1]",
+      "records": [{ "date": "2026-03-31", "facts": { "revenue": 1500000000 } }],
+      "expected": {
+        "pass": true,
+        "verdict": "supported",
+        "misquotes": [],
+        "stats": { "claims": 1, "cited": 1, "uncited": 0, "phantom": 0, "misquoted": 0 },
+        "warnings": [],
+        "answerDigest": "fnv1a64:ebe488d4fa2802ef"
+      }
+    },
+    {
+      "name": "fact-iso-date-masked-range-positive",
+      "comment": "the ISO date is masked before extraction, and 3-5% reads as 3 and 5 (never -5)",
+      "answer": "ณ 2026-03-31 คาดโต 3-5% [ev:1]",
+      "records": [{ "date": "2026-03-31", "facts": { "low": 3, "high": 5 } }],
+      "expected": {
+        "pass": true,
+        "verdict": "supported",
+        "misquotes": [],
+        "stats": { "claims": 1, "cited": 1, "uncited": 0, "phantom": 0, "misquoted": 0 },
+        "warnings": [],
+        "answerDigest": "fnv1a64:ae469f450c200c75"
+      }
+    },
+    {
+      "name": "fact-strict-year-not-in-facts-blocks",
+      "comment": "§8 strict resolution: a bare year in a cited sentence must itself be in facts",
+      "answer": "ในปี 2026 รายได้ 1,234,500 [ev:1]",
+      "records": [{ "date": "2026-03-31", "facts": { "revenue": 1234500 } }],
+      "expected": {
+        "pass": false,
+        "verdict": "misquoted_values",
+        "misquotes": [
+          { "token": "2026", "value": 2026, "sentence": "ในปี 2026 รายได้ 1,234,500 [ev:1]" }
+        ],
+        "stats": { "claims": 1, "cited": 1, "uncited": 0, "phantom": 0, "misquoted": 1 },
+        "warnings": [{ "level": "block", "code": "verify_misquoted_value" }],
+        "answerDigest": "fnv1a64:4ffd9e6a228b85ed"
+      }
+    },
+    {
+      "name": "fact-no-facts-stays-inert",
+      "comment": "opt-in: without facts the feature must not create a new failure mode",
+      "answer": "Revenue was 1.5M in Q1 [ev:1].",
+      "records": [{ "date": "2026-03-31" }],
+      "expected": {
+        "pass": true,
+        "verdict": "supported",
+        "misquotes": [],
+        "stats": { "claims": 1, "cited": 1, "uncited": 0, "phantom": 0, "misquoted": 0 },
+        "warnings": [],
+        "answerDigest": "fnv1a64:c5b15d0543cc29de"
+      }
+    },
+    {
+      "name": "fact-empty-facts-object-not-usable",
+      "comment": "facts:{} is NOT usable facts — locks the {} truthiness port trap (parity #1)",
+      "answer": "Revenue was 1.5M in Q1 [ev:1].",
+      "records": [{ "date": "2026-03-31", "facts": {} }],
+      "expected": {
+        "pass": true,
+        "verdict": "supported",
+        "misquotes": [],
+        "stats": { "claims": 1, "cited": 1, "uncited": 0, "phantom": 0, "misquoted": 0 },
+        "warnings": [],
+        "evidenceDigest": "fnv1a64:40b78e7a5447070c",
+        "answerDigest": "fnv1a64:c5b15d0543cc29de"
+      }
+    },
+    {
+      "name": "fact-union-across-citations",
+      "comment": "pool is the union of facts from every validly cited record in the sentence",
+      "answer": "Revenue 1,234,500 and EPS 0.42 [ev:1] [ev:2].",
+      "records": [
+        { "date": "2026-03-31", "facts": { "revenue": 1234500 } },
+        { "date": "2025-12-31", "facts": { "eps": 0.42 } }
+      ],
+      "expected": {
+        "pass": true,
+        "verdict": "supported",
+        "misquotes": [],
+        "stats": { "claims": 1, "cited": 1, "uncited": 0, "phantom": 0, "misquoted": 0 },
+        "warnings": [],
+        "evidenceDigest": "fnv1a64:30e2ff8a8e5c12aa",
+        "answerDigest": "fnv1a64:8785499d4524c5a8"
+      }
+    },
+    {
+      "name": "fact-phantom-outranks-misquote",
+      "comment": "ladder: phantom_citations wins the verdict, but the misquote warning still fires, ordered after phantom and before uncited",
+      "answer": "Revenue was 1.5M [ev:1]. Growth was 9% [ev:7].",
+      "records": [{ "date": "2026-03-31", "facts": { "revenue": 1234500 } }],
+      "expected": {
+        "pass": false,
+        "verdict": "phantom_citations",
+        "misquotes": [
+          { "token": "1.5M", "value": 1500000, "sentence": "Revenue was 1.5M [ev:1]." }
+        ],
+        "stats": { "claims": 2, "cited": 1, "uncited": 1, "phantom": 1, "misquoted": 1 },
+        "warnings": [
+          { "level": "block", "code": "verify_phantom_citation" },
+          { "level": "block", "code": "verify_misquoted_value" },
+          { "level": "review", "code": "verify_uncited_claim" }
+        ],
+        "answerDigest": "fnv1a64:c29ec2f7979c992d"
+      }
+    },
+    {
+      "name": "fact-supporting-record-checked",
+      "comment": "facts on a supporting record are checked exactly like primary",
+      "answer": "Margin was 31% [ev:s1].",
+      "records": [{ "date": "2026-03-31", "facts": { "revenue": 1234500 } }],
+      "supporting": [{ "id": "s1", "date": "2025-12-31", "facts": { "margin": 30 } }],
+      "expected": {
+        "pass": false,
+        "verdict": "misquoted_values",
+        "misquotes": [
+          { "token": "31", "value": 31, "sentence": "Margin was 31% [ev:s1]." }
+        ],
+        "stats": { "claims": 1, "cited": 1, "uncited": 0, "phantom": 0, "misquoted": 1 },
+        "warnings": [{ "level": "block", "code": "verify_misquoted_value" }],
+        "evidenceDigest": "fnv1a64:ab506c074903a9e8",
+        "answerDigest": "fnv1a64:8bba83b56f92fd42"
       }
     }
   ],

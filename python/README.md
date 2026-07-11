@@ -196,21 +196,30 @@ The core can't judge semantic truth, so it verifies a **citation protocol**:
    not be purely numeric; numbers are reserved for index references).
 2. Every citation in the answer must resolve to a record that exists —
    **no phantom evidence**.
-3. Every claim-looking sentence (digits, `%`/currency symbols — patterns
-   overridable via `rules.verification.claimPatterns`) must carry a valid
-   citation — **no naked claims**.
+3. Every claim-looking sentence (digits — Thai numerals included — or
+   `%`/currency symbols; patterns overridable via
+   `rules.verification.claimPatterns`) must carry a valid citation —
+   **no naked claims**.
 4. The framing must match the gate's verdict — **no "as of today" over
    stale data** (pass the gate result in).
+5. If a record carries `facts`, every number in a sentence citing it must
+   match those facts **exactly** — **no misquoted values**. `1.5M`,
+   `1,234,500`, `๑.๕ ล้าน`, `8%` all normalize deterministically (magnitude
+   suffixes `K/M/B` and Thai `พัน`…`ล้านล้าน`; ISO dates are ignored), and a
+   correctly cited but wrong number blocks with `verdict:
+   "misquoted_values"`. Opt-in per record; no facts, no change.
 
 ```js
 import { evidenceGate, verifyClaims, citationBlock, presets } from "evidence-gate";
 
+const records = [{ date: "2026-03-31", qualityScore: 92, facts: { revenue: 1234500 } }];
 const gate = evidenceGate({ records, rules: presets.FINANCE, decision: { id: "req-9" } });
 const prompt = [sys, ...gate.caveats.map(c => "- " + c), citationBlock(records), question].join("\n");
-const answer = await llm(prompt);
+const answer = await llm(prompt); // "Revenue was 1.5M [ev:1]."
 
 const v = verifyClaims({ answer, records, gate, decision: { id: "req-9" } });
-// v.verdict: "supported" | "unsupported_claims" | "no_citations" | "phantom_citations"
+// v.verdict: "supported" | "misquoted_values" | "unsupported_claims"
+//          | "no_citations" | "phantom_citations"   ← here: "misquoted_values"
 if (!v.pass) retryWith(v.caveats); // or ship with a disclosure footer
 ```
 

@@ -5,6 +5,23 @@ to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **Fact cross-checking** — records may carry `facts: { name: number, … }`;
+  `verifyClaims` / `verify_claims` then checks every number in a sentence
+  citing that record against those values, exactly (design §8). A correctly
+  cited but misquoted number now fails with new verdict `misquoted_values`
+  and block warning `verify_misquoted_value`; details in the new `misquotes`
+  result field and `stats.misquoted`. Magnitude suffixes (`K/M/B`, Thai
+  `พัน หมื่น แสน ล้าน` and compounds up to `ล้านล้าน`), thousands separators,
+  decimals, percents, and Thai numerals ๐-๙ all normalize deterministically
+  and byte-identically across both ports; ISO dates are masked. Opt-in per
+  record — without `facts` nothing changes.
+
+### Changed
+- Thai numerals ๐-๙ now count as claim digits in the default
+  `claimPatterns` — a sentence like "กำไร ๑๒ ล้าน" needs a citation. Override
+  `rules.verification.claimPatterns` to restore the old behavior.
+
 ## [1.0.0] — 2026-07-11
 
 First stable release. The proof loop is complete: the gate decides whether the

@@ -8,8 +8,9 @@
 //   1. citationBlock() renders the markers the model must cite from.
 //   2. verifyClaims() parses the answer: every citation must resolve to a
 //      record that exists (no phantom evidence), every claim-looking sentence
-//      must carry a citation (no naked claims), and the framing must match
-//      the gate's verdict (no "as of today" over stale data).
+//      must carry a citation (no naked claims), the framing must match the
+//      gate's verdict (no "as of today" over stale data), and — when records
+//      carry facts — every cited number must match them (no misquoted values).
 //
 // Spec: docs/design/claim-verification.md (approved). Zero dependencies.
 
@@ -19,9 +20,10 @@ export const VERIFICATION_SCHEMA = "evidence-gate.verification/1";
 
 // Marker grammar, shared verbatim with the Python port — one grammar only.
 const MARKER_RE_SOURCE = "\\[ev:([A-Za-z0-9_.-]+)\\]";
-// Default claim patterns: any digit, or a quantity-implying symbol.
+// Default claim patterns: any digit (ASCII or Thai — the Thai range is
+// explicit, never Unicode \d), or a quantity-implying symbol.
 // Regex SOURCES (strings), never functions — rulesets stay JSON-digestable.
-const DEFAULT_CLAIM_PATTERNS = ["\\d", "%|\\$|€|£|฿"];
+const DEFAULT_CLAIM_PATTERNS = ["\\d", "[๐-๙]", "%|\\$|€|£|฿"];
 // English-only by default; apps localize via rules.verification.freshnessPatterns.
 const DEFAULT_FRESHNESS_PATTERNS = ["\\b(today|as of now|currently|latest|real[- ]?time)\\b"];
 
@@ -81,6 +83,61 @@ function resolveRef(ref, records, supporting) {
   return null;
 }
 
+// ── fact cross-checking: deterministic misquote detection (spec §8) ───────────
+// Extraction pipeline and matching rule are normative in the design doc and
+// must stay byte-identical across ports: Thai digit translation → ISO date
+// masking → one shared token regex → decimal-point-shift canonicalization.
+
+// ISO dates are masked so date components never leak into strict matching.
+const ISO_DATE_RE_SOURCE = "(?<![0-9])[0-9]{4}-[0-9]{2}-[0-9]{2}(?![0-9])";
+// Groups: 1 = sign, 2 = integer part (comma separators), 3 = .fraction, 4 = suffix.
+// The lookbehind keeps ranges positive (3-5% → 3, 5) and stops v1.2.3 tails;
+// the lookahead keeps 512MB / 10Kg from reading as magnitudes.
+const NUMBER_TOKEN_RE_SOURCE =
+  "(?<![0-9.])(-?)([0-9]{1,3}(?:,[0-9]{3})+|[0-9]+)((?:\\.[0-9]+)?)" +
+  "(?:[ \\t]?(ล้านล้าน|แสนล้าน|หมื่นล้าน|พันล้าน|ล้าน|แสน|หมื่น|พัน|[KkMmBb](?![A-Za-z0-9])))?";
+// Fixed magnitude table (suffix → power of ten), NOT overridable.
+const MAGNITUDES = {
+  K: 3, k: 3, M: 6, m: 6, B: 9, b: 9,
+  "พัน": 3, "หมื่น": 4, "แสน": 5, "ล้าน": 6,
+  "พันล้าน": 9, "หมื่นล้าน": 10, "แสนล้าน": 11, "ล้านล้าน": 12,
+};
+
+// Thai numerals ๐-๙ (U+0E50–U+0E59) → 0-9 via an explicit offset, never
+// Unicode \d (the Python port compiles every pattern with re.ASCII).
+function translateThaiDigits(text) {
+  return text.replace(/[๐-๙]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0x0e50 + 48));
+}
+
+// Canonical value: shift the decimal point in the digit string, then parse
+// ONCE. Never multiply by a float power of ten — 1.2 * 1e6 is NOT 1200000 in
+// IEEE-754, and exact matching would break identically in both ports.
+function tokenValue(sign, intPart, fracPart, suffix) {
+  const I = intPart.replace(/,/g, "");
+  const F = fracPart ? fracPart.slice(1) : "";
+  const e = suffix ? MAGNITUDES[suffix] : 0;
+  const digits = I + F;
+  const p = I.length + e;
+  let whole, frac;
+  if (p >= digits.length) { whole = digits + "0".repeat(p - digits.length); frac = ""; }
+  else { whole = digits.slice(0, p); frac = digits.slice(p); }
+  whole = whole.replace(/^0+/, "") || "0";
+  frac = frac.replace(/0+$/, "");
+  return parseFloat(sign + whole + (frac ? "." + frac : ""));
+}
+
+// Usable facts = a plain object with ≥1 finite numeric value (booleans are
+// not numbers; {} is NOT usable — spelled out to dodge the truthiness trap).
+function factValues(record) {
+  const f = record ? record.facts : null;
+  if (!f || typeof f !== "object" || Array.isArray(f)) return [];
+  const out = [];
+  for (const k of Object.keys(f)) {
+    if (typeof f[k] === "number" && Number.isFinite(f[k])) out.push(f[k]);
+  }
+  return out;
+}
+
 // ── sentence segmentation: a stable, port-identical partition ─────────────────
 // Split on newlines, then after [.!?] followed by a space/tab. Explicit ASCII
 // whitespace classes on purpose: JS \s and Python \s disagree on exotic
@@ -132,6 +189,7 @@ export function verifyClaims({ answer, records = [], supporting = [], gate, rule
   // claim-looking sentences; markers are stripped before pattern matching so
   // a digit inside [ev:1] can never make a sentence look like a claim
   const claims = [];
+  const misquotes = [];
   let cited = 0, uncited = 0;
   for (const sentence of splitSentences(answer)) {
     const refs = [...sentence.matchAll(new RegExp(MARKER_RE_SOURCE, "g"))].map((m) => m[1]);
@@ -140,15 +198,34 @@ export function verifyClaims({ answer, records = [], supporting = [], gate, rule
     const hasValid = refs.some((ref) => resolveRef(ref, records, supporting) !== null);
     claims.push({ text: sentence, cited: hasValid, markers: refs.map((r) => "ev:" + r) });
     hasValid ? cited++ : uncited++;
+
+    // fact cross-check (§8): pool = union of numeric facts of every validly
+    // cited record; empty pool = opt-out, the sentence is skipped silently.
+    if (!hasValid) continue;
+    const pool = [];
+    for (const ref of refs) {
+      const resolved = resolveRef(ref, records, supporting);
+      if (!resolved) continue;
+      const rec = resolved.record < records.length
+        ? records[resolved.record] : supporting[resolved.record - records.length];
+      pool.push(...factValues(rec));
+    }
+    if (pool.length === 0) continue;
+    const masked = translateThaiDigits(stripped).replace(new RegExp(ISO_DATE_RE_SOURCE, "g"), " ");
+    for (const m of masked.matchAll(new RegExp(NUMBER_TOKEN_RE_SOURCE, "g"))) {
+      const value = tokenValue(m[1], m[2], m[3], m[4]);
+      if (!pool.includes(value)) misquotes.push({ token: m[0], value, sentence });
+    }
   }
 
   const phantom = citations.filter((c) => !c.valid).length;
   const validCount = citations.length - phantom;
-  const stats = { claims: claims.length, cited, uncited, phantom };
+  const stats = { claims: claims.length, cited, uncited, phantom, misquoted: misquotes.length };
 
   // verdict ladder — top-down, first hit wins
   let verdict, pass;
   if (phantom > 0) { verdict = "phantom_citations"; pass = false; }
+  else if (misquotes.length > 0) { verdict = "misquoted_values"; pass = false; }
   else if (claims.length > 0 && validCount === 0) { verdict = "no_citations"; pass = false; }
   else if (uncited > 0) { verdict = "unsupported_claims"; pass = !requireFullCoverage; }
   else { verdict = "supported"; pass = true; } // no claims at all (a refusal) passes
@@ -160,6 +237,12 @@ export function verifyClaims({ answer, records = [], supporting = [], gate, rule
     warnings.push({ level: "block", code: "verify_phantom_citation",
       message: M.verify_phantom_citation || `Citations resolve to no evidence record: ${list.join(", ")} — the model may have invented sources.` });
   }
+  if (misquotes.length > 0) {
+    const seen = new Set(), list = [];
+    for (const q of misquotes) if (!seen.has(q.token)) { seen.add(q.token); list.push(q.token); }
+    warnings.push({ level: "block", code: "verify_misquoted_value",
+      message: M.verify_misquoted_value || `Cited numbers do not match the evidence facts: ${list.join(", ")} — the model may have misquoted values.` });
+  }
   if (claims.length > 0 && validCount === 0)
     warnings.push({ level: "block", code: "verify_no_citations",
       message: M.verify_no_citations || "The answer makes claims but cites no evidence — the citation protocol was ignored." });
@@ -170,7 +253,7 @@ export function verifyClaims({ answer, records = [], supporting = [], gate, rule
     warnings.push({ level: "review", code: "verify_stale_framing",
       message: M.verify_stale_framing || `The answer uses fresh-sounding framing but the evidence is stale — the AI must not say "latest" or "today".` });
 
-  const result = { pass, verdict, citations, claims, stats, warnings, caveats: warnings.map((w) => w.message) };
+  const result = { pass, verdict, citations, claims, misquotes, stats, warnings, caveats: warnings.map((w) => w.message) };
 
   if (decision) {
     const meta = decision === true ? {} : decision;
