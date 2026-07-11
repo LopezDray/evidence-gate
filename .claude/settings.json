@@ -1,0 +1,25 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/session-start.sh",
+            "timeout": 15,
+            "statusMessage": "Loading evidence-gate rules + memory"
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "allow": [
+      "Bash(npm test)",
+      "Bash(node test/*)",
+      "Bash(node examples/*)",
+      "Bash(python3 python/tests/test_core.py)",
+      "Bash(python python/tests/test_core.py)"
+    ]
+  }
+}
