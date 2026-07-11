@@ -12,6 +12,7 @@ from .core import (
     evidence_digest,
     DECISION_SCHEMA,
 )
+from .verify import verify_claims, citation_block, VERIFICATION_SCHEMA
 from . import presets
 
 __all__ = [
@@ -26,6 +27,9 @@ __all__ = [
     "fnv1a64",
     "evidence_digest",
     "DECISION_SCHEMA",
+    "verify_claims",
+    "citation_block",
+    "VERIFICATION_SCHEMA",
     "presets",
 ]
 __version__ = "0.1.0"

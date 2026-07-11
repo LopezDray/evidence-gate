@@ -119,6 +119,56 @@ Digests are FNV-1a 64 over canonical JSON — deterministic and identical across
 the JS and Python ports (not cryptographic; they detect drift, not adversaries).
 See `examples/decision-log.mjs` for the full flow.
 
+## The proof loop — verify the answer, not just the evidence
+
+The gate decides *whether* the model may speak. `verifyClaims` closes the
+loop: it checks whether what the model said **stands on the evidence it was
+given** — deterministically, with no model call.
+
+```
+retrieve ──► evidenceGate ──► prompt (+ citation block) ──► LLM ──► verifyClaims
+                 │ decision record                                     │ verification record
+                 └────────────── same evidence digest links both ──────┘
+```
+
+The core can't judge semantic truth, so it verifies a **citation protocol**:
+
+1. `citationBlock(records)` renders the markers the model must cite from —
+   `[ev:1]`, `[ev:2]`, or `[ev:acme-q1]` if a record has an `id` (ids must
+   not be purely numeric; numbers are reserved for index references).
+2. Every citation in the answer must resolve to a record that exists —
+   **no phantom evidence**.
+3. Every claim-looking sentence (digits, `%`/currency symbols — patterns
+   overridable via `rules.verification.claimPatterns`) must carry a valid
+   citation — **no naked claims**.
+4. The framing must match the gate's verdict — **no "as of today" over
+   stale data** (pass the gate result in).
+
+```js
+import { evidenceGate, verifyClaims, citationBlock, presets } from "evidence-gate";
+
+const gate = evidenceGate({ records, rules: presets.FINANCE, decision: { id: "req-9" } });
+const prompt = [sys, ...gate.caveats.map(c => "- " + c), citationBlock(records), question].join("\n");
+const answer = await llm(prompt);
+
+const v = verifyClaims({ answer, records, gate, decision: { id: "req-9" } });
+// v.verdict: "supported" | "unsupported_claims" | "no_citations" | "phantom_citations"
+if (!v.pass) retryWith(v.caveats); // or ship with a disclosure footer
+```
+
+Strict by default: `pass` is `true` only when **every** claim is cited
+(`rules.verification.requireFullCoverage: false` to loosen). An answer with
+no claims at all — a refusal — passes: refusing correctly must survive the
+loop. Supporting records are citable too, but tagged `tier: "supporting"` in
+`v.citations` so strict apps can reject them.
+
+With `decision` opted in, the verification record
+(`evidence-gate.verification/1`) joins the gate's decision record on the
+request id **and** on an identical evidence digest — so for every answer your
+log can prove which evidence was allowed and what the model did with it,
+without storing the evidence or the answer. See `examples/verified-loop.mjs`
+for the full loop.
+
 ## Use it as an MCP server
 
 Give an agent a fact-checker it calls before it speaks. The package ships an MCP server exposing a `check_evidence` tool, so any MCP-compatible agent (Claude, IDE assistants, etc.) can gate itself.

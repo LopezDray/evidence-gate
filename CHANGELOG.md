@@ -6,6 +6,24 @@ to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **Post-generation claim verification** (P3-2) — `verifyClaims` /
+  `verify_claims` closes the proof loop: every citation in the answer must
+  resolve to a real evidence record (no phantom evidence), every
+  claim-looking sentence must carry a citation (no naked claims), and the
+  framing must match the gate's verdict (no "as of today" over stale data).
+  Verdict ladder `phantom_citations` → `no_citations` →
+  `unsupported_claims` → `supported`; strict by default
+  (`rules.verification.requireFullCoverage`). Deterministic, no model call,
+  byte-identical across both ports (locked by shared vectors).
+- `citationBlock` / `citation_block` — renders the evidence markers
+  (`[ev:1]`, `[ev:acme-q1]`) the model must cite from; records gain an
+  optional non-numeric `id`. Supporting records are citable and tagged
+  `tier: "supporting"` in `citations[]`.
+- **Verification record** (`evidence-gate.verification/1`) — opt-in via
+  `decision`, mirrors the gate's decision log and joins it on the request id
+  and an identical evidence digest; adds an answer digest. Neither the
+  evidence nor the answer text is stored. See `examples/verified-loop.mjs`
+  and README "The proof loop".
 - **Shared cross-port test vectors** (`test/vectors.json`) — one file of gate
   cases, canonical-JSON strings, and FNV-1a digests that BOTH the JS suite
   (`test/vectors.test.mjs`) and the Python suite (`python/tests/test_core.py`)

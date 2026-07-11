@@ -10,6 +10,7 @@ from evidence_gate.core import (
     canonical_json, fnv1a64, evidence_digest, DECISION_SCHEMA,
 )
 from evidence_gate.presets import FINANCE, HEALTH
+from evidence_gate.verify import verify_claims, citation_block, VERIFICATION_SCHEMA
 
 # Shared cross-port vectors (test/vectors.json) are written in the JS port's
 # camelCase convention; these maps translate to this port's snake_case.
@@ -23,6 +24,11 @@ RULES_KEY_MAP = {
     "messages": "messages",
 }
 RECORD_KEY_MAP = {"qualityScore": "quality_score"}
+VERIFICATION_KEY_MAP = {
+    "requireFullCoverage": "require_full_coverage",
+    "claimPatterns": "claim_patterns",
+    "freshnessPatterns": "freshness_patterns",
+}
 
 
 def _map_keys(obj, key_map):
@@ -177,6 +183,40 @@ def test_shared_vectors():
             # byte-identical digest across ports — the audit-trail guarantee
             assert g["decision"]["digests"]["evidence"] == e["evidenceDigest"], name
 
+    for c in vectors["citationBlock"]:
+        records = [_map_keys(r, RECORD_KEY_MAP) for r in c["records"]]
+        supporting = [_map_keys(r, RECORD_KEY_MAP) for r in c.get("supporting") or []]
+        got = citation_block(records, {"supporting": supporting})
+        assert got == c["expected"], (c["name"], got)
+
+    for c in vectors["verify"]:
+        name = c["name"]
+        records = [_map_keys(r, RECORD_KEY_MAP) for r in c["records"]]
+        supporting = [_map_keys(r, RECORD_KEY_MAP) for r in c.get("supporting") or []]
+        rules = c.get("rules")
+        if rules and "verification" in rules:
+            rules = dict(rules)
+            rules["verification"] = _map_keys(rules["verification"], VERIFICATION_KEY_MAP)
+        v = verify_claims(answer=c["answer"], records=records, supporting=supporting,
+                          gate=c.get("gate"), rules=rules, decision=True)
+        e = c["expected"]
+        assert v["pass"] == e["pass"], name
+        assert v["verdict"] == e["verdict"], name
+        assert v["stats"] == e["stats"], name
+        got_warnings = [{"level": w["level"], "code": w["code"]} for w in v["warnings"]]
+        assert got_warnings == e["warnings"], name
+        if "citations" in e:
+            assert v["citations"] == e["citations"], (name, v["citations"])
+        if "claims" in e:
+            assert v["claims"] == e["claims"], (name, v["claims"])
+        if "caveats" in e:
+            assert v["caveats"] == e["caveats"], (name, v["caveats"])
+        if "evidenceDigest" in e:
+            assert v["decision"]["digests"]["evidence"] == e["evidenceDigest"], name
+        if "answerDigest" in e:
+            # byte-identical answer digest across ports
+            assert v["decision"]["digests"]["answer"] == e["answerDigest"], name
+
     for c in vectors["invalidRules"]:
         rules = _map_keys(c["rules"], RULES_KEY_MAP)
         try:
@@ -188,8 +228,58 @@ def test_shared_vectors():
                 assert f'rules["{field}"]' in str(err), (c["name"], str(err))
 
 
+def test_verification_record():
+    records = [{"date": "2026-03-31"}, {"date": "2025-12-31"}]
+    answer = "Revenue was 1.2M [ev:1]. Cash was 3M [ev:2]."
+
+    # opt-in only
+    assert "decision" not in verify_claims(answer=answer, records=records)
+
+    v = verify_claims(answer=answer, records=records,
+                      decision={"id": "req-9", "at": "2026-07-11T10:00:00Z"})
+    d = v["decision"]
+    assert d["schema"] == VERIFICATION_SCHEMA == "evidence-gate.verification/1"
+    assert d["id"] == "req-9" and d["at"] == "2026-07-11T10:00:00Z"
+    assert d["verdict"] == v["verdict"] and d["pass"] == v["pass"]
+    assert d["stats"] == v["stats"]
+    assert all("message" not in w for w in d["warnings"])
+
+    # the digest join: same records -> gate decision and verification record
+    # carry the SAME evidence digest; the answer digest is separate
+    g = evidence_gate(records=records, rules=FINANCE, decision={"id": "req-9"})
+    assert g["decision"]["digests"]["evidence"] == d["digests"]["evidence"]
+    assert d["digests"]["answer"] != d["digests"]["evidence"]
+
+    # privacy: neither the answer nor the evidence appears in the record
+    blob = json.dumps(d)
+    assert "Revenue" not in blob and "2026-03-31" not in blob
+    assert "\n" not in blob  # JSONL-serializable
+
+    # messy input never raises
+    assert verify_claims(answer=None, records=None)["verdict"] == "supported"
+    assert verify_claims(answer=12345, records=records)["verdict"] == "no_citations"
+
+    # marker binds to its sentence: a valid citation in one sentence does not
+    # cover a claim in another
+    v2 = verify_claims(answer="Revenue was 1.2M [ev:1]. Cash was 3M.", records=records)
+    assert v2["verdict"] == "unsupported_claims" and v2["stats"]["uncited"] == 1
+
+    # duplicate markers are counted per occurrence in citations[]
+    v3 = verify_claims(answer="Revenue 1M [ev:1] [ev:1].", records=records)
+    assert len(v3["citations"]) == 2 and v3["stats"]["cited"] == 1
+
+
+def test_citation_block_overrides():
+    records = [{"date": "2026-03-31", "quality_score": 92}]
+    block = citation_block(records, {"header": "HDR:", "line": lambda r, marker, i: f"* {marker} -> {r['date']}"})
+    assert block == "HDR:\n* 1 -> 2026-03-31"
+    # empty evidence -> header only
+    assert citation_block([]) == "EVIDENCE (cite with its marker after every factual statement):"
+
+
 if __name__ == "__main__":
     test_classify(); test_allowed_actions(); test_date_validation(); test_domain_swap()
     test_digest_primitives(); test_decision_record()
     test_rules_validation(); test_shared_vectors()
+    test_verification_record(); test_citation_block_overrides()
     print("all tests passed")
