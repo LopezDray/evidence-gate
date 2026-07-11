@@ -2,12 +2,13 @@
 
 ## พร้อมทำ (เรียงตามลำดับ)
 
-1. **P3-3 Release v1.0** — prep เสร็จถึงข้อ 7 แล้ว (bump 1.0.0, CHANGELOG `[1.0.0]`,
-   release notes `docs/release-notes-v1.0.md`) รอ merge PR แล้ว **ติดเจ้าของล้วน**:
-   ข้อ 8-11 ของ `release-checklist.md` = tag `v1.0.0` + `npm publish` + PyPI + GitHub Release
-   · **case study**: `docs/case-study-daddyinvestor.md` เป็น skeleton — เจ้าของเติมตัวเลขจริง
-   (ห้ามแต่งเลข) แล้วค่อยลิงก์จาก README
-2. ~~P0-2 CI badge~~ ✅ เสร็จ (README badges test/npm/PyPI/license)
+1. **[Fable] Fact cross-checking** (`verify_misquoted_value`) — งานหลักตัวถัดไป
+   · kickoff เต็ม: **`docs/fable-fact-checking-kickoff.md`** (อ่านก่อน) · design ปิดก่อน code
+2. **P3-3 Release v1.0** — โค้ด+version+docs อยู่บน main แล้ว (PR #14 merged, `f681773`)
+   · **ติดเจ้าของล้วน**: `release-checklist.md` ข้อ 8-11 = tag `v1.0.0` + `npm publish` + PyPI
+   + GitHub Release (ใช้ `docs/release-notes-v1.0.md`) · เติม `docs/case-study-daddyinvestor.md`
+   (skeleton — ห้ามแต่งเลข) แล้วลิงก์จาก README
+3. ~~P0-2 CI badge~~ ✅ เสร็จ
 
 ## ติดเจ้าของล้วน (Claude ไม่ต้องแตะ)
 
@@ -17,16 +18,10 @@
 
 - **P3-4 Dashboard self-host** — เริ่มได้เมื่อ: ผู้ใช้จริง ≥10 **หรือ** มีคนขอ ≥3 (#8)
 
-## งานหลักเหลือ (Fable-profile: cross-port determinism)
-
-- **Fact cross-checking** (`verify_misquoted_value`, claim-verification §8) — record แนบ
-  `facts`, verifyClaims เช็คตัวเลขในประโยคที่ cite ตรงกับ fact จริง · **ต้อง design ปิด
-  กติกา normalize ที่ byte-identical ก่อน** (เลขไทย/ตัวคั่น/สกุลเงิน/rounding) · ตัว moat ที่ใหญ่สุดที่เหลือ
-- ~~tamper-evident chain~~ ✅ เสร็จ (fold เข้า 1.0.0)
-
 ## Follow-up เล็กที่จดไว้ (โมเดลไหนก็ทำได้ — MCP JS-only ไม่มี parity)
 
 - MCP server ควรได้ tool `verify_claims` (spec §11 บอก "for free in a follow-up")
 - `evidenceGate` ยังไม่รับ `supporting` ผ่าน MCP `check_evidence` แบบมี tier ใน docs — เช็คตอนทำ verify_claims tool
 
-_อัปเดตล่าสุด: 2026-07-11 (Phase 3 implement ครบ + ระบบปฏิบัติงาน merge PR #13 · main = `9fa5af0`)_
+_อัปเดตล่าสุด: 2026-07-11 (ปิด session · v1.0.0 prep + tamper-evident chain merged PR #14 ·
+main = `f681773` · งานถัดไป = Fable fact-checking ดู `docs/fable-fact-checking-kickoff.md`)_

@@ -13,7 +13,7 @@
 | งาน | สถานะ |
 |---|---|
 | P0-1 PyPI name collision | ✅ เสร็จ — publish `evidence-gate-py` แล้ว, repo + README ตรงกัน (README เตือนว่า import ยังเป็น `from evidence_gate import ...`) |
-| P0-2 CI | ⚙️ workflow รันครบทุก suite แล้ว — เหลือ badge บน README (#2) |
+| P0-2 CI + badge | ✅ เสร็จ — workflow รันครบทุก suite + README badges (test/npm/PyPI/license) (#2) |
 | P1-1 Decision log / audit trail | ✅ เสร็จ + ซ่อม null-records crash และ align สองพอร์ต (#3) |
 | P1-2 Release v0.2.0 | ✅ เสร็จ — npm `evidence-gate@0.2.0` + PyPI `evidence-gate-py@0.2.0`, CHANGELOG, merge เข้า main, tag `v0.2.0` → `662a832` (#4) |
 | P1-4 Launch | 📝 ร่างโพสต์ Show HN / Reddit (r/LocalLLaMA, r/RAG) / X พร้อมแล้ว — รอเจ้าของโพสต์ + ตอบคอมเมนต์ 48 ชม. (#6) |
@@ -21,6 +21,11 @@
 | P3-2 verifyClaims — claim verification | ✅ เสร็จ (2026-07-11) — `verifyClaims`/`citationBlock` + verdict ladder + `evidence-gate.verification/1` digest-join กับ decision log, `examples/verified-loop.mjs`, README "The proof loop" — commit `c9c7ae7` |
 | P3-1 Provenance | ✅ เสร็จ (2026-07-11) — `validateProvenance` chain rules + `rules.provenance` warnings + attribution caveat + `decision.provenance` block (digest replay ได้), `examples/provenance.mjs` — commit `5a7d37b` |
 | Logic review รอบ Fable 5 | ✅ เจอ+ซ่อมบั๊ก 3 จุด, พบ divergence เดิม 1 จุด (rules validation) และช่องว่าง spec 6 ข้อ — ปิดหมดแล้วใน WP2/P3-1/P3-2 (vectors จับ divergence เพิ่มได้อีก 4 จุดระหว่างทาง: Python `{}` rules falsy ×2, JS `forbiddenActions: null` crash, Python explicit-`None` optional fields) |
+| Tamper-evident decision chain | ✅ เสร็จ (2026-07-11) — `chainDecision`/`verifyDecisionChain` (+Python), `prev` additive (schema ยัง /1), vectors `decisionChain` ล็อกสองพอร์ต, `examples/tamper-evident-log.mjs` — provenance.md §7 implemented |
+| **P3-3 Release v1.0** | 🚀 โค้ด+version(1.0.0)+docs อยู่บน main แล้ว (PR #14, `f681773`) — **ติดเจ้าของ**: publish npm/PyPI + tag `v1.0.0` + เติม case study (`release-checklist.md` ข้อ 8-11) |
+
+**Phase 3 implementation ปิดครบ** (gate + verifyClaims + provenance + tamper-evident chain).
+งานหลักถัดไป = **fact cross-checking** (Fable) ดู [`docs/fable-fact-checking-kickoff.md`](fable-fact-checking-kickoff.md)
 
 **Phase 3 implement ครบสามงานหลักแล้ว (WP2 → P3-2 → P3-1)** — เหลือ **P3-3 release v1.0 + case study**
 (รอเจ้าของ: publish npm/PyPI + เนื้อหา case study) และ **P3-4 dashboard** (ยังไม่ถึง trigger:
