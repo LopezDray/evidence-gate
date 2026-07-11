@@ -8,11 +8,13 @@ identically across the JS and Python ports:
 1. citation_block() renders the markers the model must cite from.
 2. verify_claims() parses the answer: every citation must resolve to a
    record that exists (no phantom evidence), every claim-looking sentence
-   must carry a citation (no naked claims), and the framing must match the
-   gate's verdict (no "as of today" over stale data).
+   must carry a citation (no naked claims), the framing must match the
+   gate's verdict (no "as of today" over stale data), and — when records
+   carry facts — every cited number must match them (no misquoted values).
 
 Spec: docs/design/claim-verification.md (approved). No dependencies.
 """
+import math
 import re
 from datetime import datetime, timezone
 
@@ -22,9 +24,10 @@ VERIFICATION_SCHEMA = "evidence-gate.verification/1"
 
 # Marker grammar, shared verbatim with the JS port — one grammar only.
 _MARKER_RE = re.compile(r"\[ev:([A-Za-z0-9_.-]+)\]")
-# Default claim patterns: any digit, or a quantity-implying symbol.
+# Default claim patterns: any digit (ASCII or Thai — the Thai range is
+# explicit, never Unicode \d), or a quantity-implying symbol.
 # Regex SOURCES (strings), never functions — rulesets stay JSON-digestable.
-_DEFAULT_CLAIM_PATTERNS = ["\\d", "%|\\$|€|£|฿"]
+_DEFAULT_CLAIM_PATTERNS = ["\\d", "[๐-๙]", "%|\\$|€|£|฿"]
 # English-only by default; apps localize via rules["verification"]["freshness_patterns"].
 _DEFAULT_FRESHNESS_PATTERNS = ["\\b(today|as of now|currently|latest|real[- ]?time)\\b"]
 
@@ -36,6 +39,59 @@ _NUMERIC_RE = re.compile(r"^[0-9]+$")
 _LINE_SPLIT = re.compile(r"\r?\n")
 _SENTENCE_SPLIT = re.compile(r"(?<=[.!?])[ \t]+")
 _STRIP_CHARS = " \t\r\f\v"
+
+# ── fact cross-checking: deterministic misquote detection (spec §8) ──────────
+# Extraction pipeline and matching rule are normative in the design doc and
+# must stay byte-identical across ports: Thai digit translation → ISO date
+# masking → one shared token regex → decimal-point-shift canonicalization.
+
+# ISO dates are masked so date components never leak into strict matching.
+_ISO_DATE_RE = re.compile(r"(?<![0-9])[0-9]{4}-[0-9]{2}-[0-9]{2}(?![0-9])", re.ASCII)
+# Groups: 1 = sign, 2 = integer part (comma separators), 3 = .fraction, 4 = suffix.
+# The lookbehind keeps ranges positive (3-5% → 3, 5) and stops v1.2.3 tails;
+# the lookahead keeps 512MB / 10Kg from reading as magnitudes.
+_NUMBER_TOKEN_RE = re.compile(
+    r"(?<![0-9.])(-?)([0-9]{1,3}(?:,[0-9]{3})+|[0-9]+)((?:\.[0-9]+)?)"
+    r"(?:[ \t]?(ล้านล้าน|แสนล้าน|หมื่นล้าน|พันล้าน|ล้าน|แสน|หมื่น|พัน|[KkMmBb](?![A-Za-z0-9])))?",
+    re.ASCII)
+# Fixed magnitude table (suffix → power of ten), NOT overridable.
+_MAGNITUDES = {
+    "K": 3, "k": 3, "M": 6, "m": 6, "B": 9, "b": 9,
+    "พัน": 3, "หมื่น": 4, "แสน": 5, "ล้าน": 6,
+    "พันล้าน": 9, "หมื่นล้าน": 10, "แสนล้าน": 11, "ล้านล้าน": 12,
+}
+# Thai numerals ๐-๙ (U+0E50–U+0E59) → 0-9 via an explicit table, never
+# Unicode \d (every pattern here is compiled with re.ASCII on purpose).
+_THAI_DIGITS = {0x0E50 + i: str(i) for i in range(10)}
+
+
+def _token_value(sign, int_part, frac_part, suffix):
+    """Canonical value: shift the decimal point in the digit string, then
+    parse ONCE. Never multiply by a float power of ten — 1.2 * 1e6 is NOT
+    1200000 in IEEE-754, and exact matching would break in both ports."""
+    i = int_part.replace(",", "")
+    f = frac_part[1:] if frac_part else ""
+    e = _MAGNITUDES[suffix] if suffix else 0
+    digits = i + f
+    p = len(i) + e
+    if p >= len(digits):
+        whole, frac = digits + "0" * (p - len(digits)), ""
+    else:
+        whole, frac = digits[:p], digits[p:]
+    whole = whole.lstrip("0") or "0"
+    frac = frac.rstrip("0")
+    return float((sign or "") + whole + ("." + frac if frac else ""))
+
+
+def _fact_values(record):
+    """Usable facts = a plain dict with ≥1 finite numeric value (bools are
+    not numbers; {} is NOT usable — spelled out to dodge the truthiness
+    trap, parity #1)."""
+    facts = record.get("facts") if isinstance(record, dict) else None
+    if not isinstance(facts, dict):
+        return []
+    return [v for v in facts.values()
+            if isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v)]
 
 
 def _usable_id(record_id):
@@ -151,6 +207,7 @@ def verify_claims(answer=None, records=None, supporting=None, gate=None, rules=N
     # claim-looking sentences; markers are stripped before pattern matching so
     # a digit inside [ev:1] can never make a sentence look like a claim
     claims = []
+    misquotes = []
     cited = 0
     uncited = 0
     for sentence in _split_sentences(answer):
@@ -165,13 +222,36 @@ def verify_claims(answer=None, records=None, supporting=None, gate=None, rules=N
         else:
             uncited += 1
 
+        # fact cross-check (§8): pool = union of numeric facts of every
+        # validly cited record; empty pool = opt-out, skipped silently.
+        if not has_valid:
+            continue
+        pool = []
+        for ref in refs:
+            resolved = _resolve_ref(ref, records, supporting)
+            if resolved is None:
+                continue
+            rec = (records[resolved["record"]] if resolved["record"] < len(records)
+                   else supporting[resolved["record"] - len(records)])
+            pool.extend(_fact_values(rec))
+        if not pool:
+            continue
+        masked = _ISO_DATE_RE.sub(" ", stripped.translate(_THAI_DIGITS))
+        for tok in _NUMBER_TOKEN_RE.finditer(masked):
+            value = _token_value(tok.group(1), tok.group(2), tok.group(3), tok.group(4))
+            if value not in pool:
+                misquotes.append({"token": tok.group(0), "value": value, "sentence": sentence})
+
     phantom = sum(1 for c in citations if not c["valid"])
     valid_count = len(citations) - phantom
-    stats = {"claims": len(claims), "cited": cited, "uncited": uncited, "phantom": phantom}
+    stats = {"claims": len(claims), "cited": cited, "uncited": uncited, "phantom": phantom,
+             "misquoted": len(misquotes)}
 
     # verdict ladder — top-down, first hit wins
     if phantom > 0:
         verdict, passed = "phantom_citations", False
+    elif misquotes:
+        verdict, passed = "misquoted_values", False
     elif claims and valid_count == 0:
         verdict, passed = "no_citations", False
     elif uncited > 0:
@@ -189,6 +269,15 @@ def verify_claims(answer=None, records=None, supporting=None, gate=None, rules=N
         warnings.append({"level": "block", "code": "verify_phantom_citation",
                          "message": m.get("verify_phantom_citation",
                                           f'Citations resolve to no evidence record: {", ".join(listed)} — the model may have invented sources.')})
+    if misquotes:
+        seen, listed = set(), []
+        for q in misquotes:
+            if q["token"] not in seen:
+                seen.add(q["token"])
+                listed.append(q["token"])
+        warnings.append({"level": "block", "code": "verify_misquoted_value",
+                         "message": m.get("verify_misquoted_value",
+                                          f'Cited numbers do not match the evidence facts: {", ".join(listed)} — the model may have misquoted values.')})
     if claims and valid_count == 0:
         warnings.append({"level": "block", "code": "verify_no_citations",
                          "message": m.get("verify_no_citations",
@@ -203,7 +292,8 @@ def verify_claims(answer=None, records=None, supporting=None, gate=None, rules=N
                                           'The answer uses fresh-sounding framing but the evidence is stale — the AI must not say "latest" or "today".')})
 
     result = {"pass": passed, "verdict": verdict, "citations": citations, "claims": claims,
-              "stats": stats, "warnings": warnings, "caveats": [w["message"] for w in warnings]}
+              "misquotes": misquotes, "stats": stats, "warnings": warnings,
+              "caveats": [w["message"] for w in warnings]}
 
     if decision:
         meta = {} if decision is True else decision

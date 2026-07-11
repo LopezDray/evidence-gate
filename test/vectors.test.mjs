@@ -107,6 +107,7 @@ for (const c of vectors.verify) {
     JSON.stringify(v.warnings));
   if (e.citations) ok(`verify ${c.name}: citations`, eq(v.citations, e.citations), JSON.stringify(v.citations));
   if (e.claims) ok(`verify ${c.name}: claims`, eq(v.claims, e.claims), JSON.stringify(v.claims));
+  if (e.misquotes) ok(`verify ${c.name}: misquotes`, eq(v.misquotes, e.misquotes), JSON.stringify(v.misquotes));
   if (e.caveats) ok(`verify ${c.name}: caveats`, eq(v.caveats, e.caveats), JSON.stringify(v.caveats));
   if (e.evidenceDigest)
     ok(`verify ${c.name}: evidence digest (cross-port)`,

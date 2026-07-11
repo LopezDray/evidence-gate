@@ -85,6 +85,26 @@ ok("stale gate + neutral wording -> no stale warning",
   ok("custom claimPatterns replace defaults", r.verdict === "no_citations" && r.stats.claims === 1);
 }
 
+// ── fact cross-checking (§8) API edges the vectors don't cover ────────────────
+{
+  const facted = [{ date: "2026-03-31", facts: { revenue: 1234500 } }];
+  const r = verifyClaims({ answer: "Revenue was 1.5M [ev:1].", records: facted,
+    rules: { messages: { verify_misquoted_value: "เลขไม่ตรงหลักฐาน" } }, decision: true });
+  ok("verify_misquoted_value message override", r.caveats[0] === "เลขไม่ตรงหลักฐาน");
+  ok("decision.stats carries misquoted", r.decision.stats.misquoted === 1);
+  ok("misquotes detail: token/value/sentence",
+    r.misquotes.length === 1 && r.misquotes[0].token === "1.5M" && r.misquotes[0].value === 1500000);
+}
+ok("facts: null stays inert (not an object)",
+  verifyClaims({ answer: "Revenue was 1.5M [ev:1].",
+    records: [{ date: "2026-03-31", facts: null }] }).verdict === "supported");
+ok("non-numeric facts values are ignored",
+  verifyClaims({ answer: "Revenue was 1.5M [ev:1].",
+    records: [{ date: "2026-03-31", facts: { note: "restated" } }] }).verdict === "supported");
+ok("uncited claim is not fact-checked (already flagged uncited)",
+  verifyClaims({ answer: "Revenue was 1.5M.",
+    records: [{ date: "2026-03-31", facts: { revenue: 1234500 } }] }).stats.misquoted === 0);
+
 // ── citationBlock overrides ───────────────────────────────────────────────────
 ok("citationBlock header + line overrides",
   citationBlock([{ date: "2026-03-31", qualityScore: 92 }],

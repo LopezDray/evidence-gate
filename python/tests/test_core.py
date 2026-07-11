@@ -263,6 +263,8 @@ def test_shared_vectors():
             assert v["citations"] == e["citations"], (name, v["citations"])
         if "claims" in e:
             assert v["claims"] == e["claims"], (name, v["claims"])
+        if "misquotes" in e:
+            assert v["misquotes"] == e["misquotes"], (name, v["misquotes"])
         if "caveats" in e:
             assert v["caveats"] == e["caveats"], (name, v["caveats"])
         if "evidenceDigest" in e:
@@ -399,6 +401,31 @@ def test_decision_chain():
     assert verify_decision_chain([None])["broken_at"] == 0
 
 
+def test_fact_check():
+    """§8 API edges the shared vectors don't cover (parity behavior itself is
+    locked cross-port in vectors.json)."""
+    facted = [{"date": "2026-03-31", "facts": {"revenue": 1234500}}]
+    v = verify_claims(answer="Revenue was 1.5M [ev:1].", records=facted,
+                      rules={"messages": {"verify_misquoted_value": "เลขไม่ตรงหลักฐาน"}},
+                      decision=True)
+    assert v["caveats"][0] == "เลขไม่ตรงหลักฐาน"
+    assert v["decision"]["stats"]["misquoted"] == 1
+    assert v["misquotes"] == [{"token": "1.5M", "value": 1500000,
+                               "sentence": "Revenue was 1.5M [ev:1]."}]
+
+    # facts must be a dict with >=1 numeric value — None/{}/non-numeric stay
+    # inert (the {} truthiness trap, parity #1); bool is not a number
+    for facts in (None, {}, {"note": "restated"}, {"flag": True}):
+        r = verify_claims(answer="Revenue was 1.5M [ev:1].",
+                          records=[{"date": "2026-03-31", "facts": facts}])
+        assert r["verdict"] == "supported", facts
+
+    # uncited claim is not fact-checked (already flagged by the citation
+    # ladder — here as no_citations, since the whole answer has no marker)
+    r = verify_claims(answer="Revenue was 1.5M.", records=facted)
+    assert r["stats"]["misquoted"] == 0 and r["verdict"] == "no_citations"
+
+
 def test_citation_block_overrides():
     records = [{"date": "2026-03-31", "quality_score": 92}]
     block = citation_block(records, {"header": "HDR:", "line": lambda r, marker, i: f"* {marker} -> {r['date']}"})
@@ -411,6 +438,6 @@ if __name__ == "__main__":
     test_classify(); test_allowed_actions(); test_date_validation(); test_domain_swap()
     test_digest_primitives(); test_decision_record()
     test_rules_validation(); test_shared_vectors()
-    test_verification_record(); test_citation_block_overrides()
+    test_verification_record(); test_fact_check(); test_citation_block_overrides()
     test_provenance(); test_decision_chain()
     print("all tests passed")
