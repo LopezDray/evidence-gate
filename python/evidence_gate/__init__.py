@@ -12,6 +12,8 @@ from .core import (
     canonical_json,
     fnv1a64,
     evidence_digest,
+    chain_decision,
+    verify_decision_chain,
     DECISION_SCHEMA,
 )
 from .verify import verify_claims, citation_block, VERIFICATION_SCHEMA
@@ -30,6 +32,8 @@ __all__ = [
     "canonical_json",
     "fnv1a64",
     "evidence_digest",
+    "chain_decision",
+    "verify_decision_chain",
     "DECISION_SCHEMA",
     "verify_claims",
     "citation_block",

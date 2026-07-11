@@ -20,6 +20,14 @@ byte-identical across the JS and Python ports, locked by a shared vector file.
   hand-built ruleset rather than a preset, ensure these three fields are set.
 
 ### Added
+- **Tamper-evident decision log** — `chainDecision` / `chain_decision` links
+  each decision record to the previous one by digest (`prev` field);
+  `verifyDecisionChain` / `verify_decision_chain` replays a log and reports the
+  first broken link. Editing any past JSONL line invalidates every record after
+  it. `prev` is additive (schema stays `evidence-gate.decision/1`); zero
+  dependency, byte-identical across ports. Not cryptographic — detects
+  after-the-fact edits, not a full-tail rewrite. See
+  `examples/tamper-evident-log.mjs`.
 - **Evidence provenance** (P3-1) — records can opt in to a `provenance`
   block (`source` id/type/authority, `retrievedAt`, `contentHash`, hash-linked
   transform `chain`). `validateProvenance` / `validate_provenance` checks

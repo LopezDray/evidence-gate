@@ -1,5 +1,5 @@
 // Evidence Gate — decision log tests (no deps): node test/decision.test.mjs
-import { evidenceGate, canonicalJson, fnv1a64, evidenceDigest, DECISION_SCHEMA, validateProvenance } from "../src/core.js";
+import { evidenceGate, canonicalJson, fnv1a64, evidenceDigest, DECISION_SCHEMA, validateProvenance, chainDecision, verifyDecisionChain } from "../src/core.js";
 import { FINANCE } from "../src/presets.js";
 
 const iso = (daysAgo) => {
@@ -118,6 +118,42 @@ ok("no provenance warnings without rules.provenance",
 ok("validateProvenance(null record) is valid", validateProvenance(null).valid === true);
 ok("validateProvenance(garbage) reports, not throws",
   validateProvenance({ provenance: 42 }).problems.includes("invalid_provenance"));
+
+// ── tamper-evident chain over REAL decision records ───────────────────────────
+{
+  // build a 3-link chain from actual gate decisions
+  const decs = [
+    evidenceGate({ records, rules: FINANCE, decision: { id: "d1", at: "2026-07-11T10:00:00Z" } }).decision,
+    evidenceGate({ records: records.slice(0, 3), rules: FINANCE, decision: { id: "d2", at: "2026-07-11T10:00:05Z" } }).decision,
+    evidenceGate({ records: [], rules: FINANCE, decision: { id: "d3", at: "2026-07-11T10:00:09Z" } }).decision,
+  ];
+  const chain = [];
+  let prev = null;
+  for (const d of decs) { const l = chainDecision(d, prev); chain.push(l); prev = evidenceDigest(l); }
+
+  ok("chainDecision keeps schema /1 (additive prev field)", chain[0].schema === DECISION_SCHEMA);
+  ok("head prev is null", chain[0].prev === null);
+  ok("valid decision chain verifies", verifyDecisionChain(chain).valid === true);
+
+  // edit a past record (its caller id) → every link after it breaks; brokenAt = first
+  const tampered = chain.map((r) => ({ ...r }));
+  tampered[0].id = "HACKED";
+  const tv = verifyDecisionChain(tampered);
+  ok("editing a past record breaks the chain at the next link", tv.valid === false && tv.brokenAt === 1);
+
+  // edits are JSONL-serializable and prev survives round-trip through the log
+  const roundTrip = chain.map((r) => JSON.parse(JSON.stringify(r)));
+  ok("chain verifies after JSONL round-trip", verifyDecisionChain(roundTrip).valid === true);
+}
+
+// ── chain API edges ───────────────────────────────────────────────────────────
+ok("chainDecision default prev is null", chainDecision({ a: 1 }).prev === null);
+ok("chainDecision does not mutate its input", (() => { const d = { a: 1 }; chainDecision(d, "x"); return d.prev === undefined; })());
+ok("empty chain is valid", verifyDecisionChain([]).valid === true);
+ok("verifyDecisionChain(null) does not throw", verifyDecisionChain(null).valid === true);
+ok("single record with non-null prev breaks at 0",
+  verifyDecisionChain([chainDecision({ a: 1 }, "fnv1a64:dead")]).brokenAt === 0);
+ok("non-object in chain breaks at its index", verifyDecisionChain([null]).brokenAt === 0);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail === 0 ? 0 : 1);

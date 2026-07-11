@@ -50,6 +50,23 @@
       "expected": "fnv1a64:b154377d61167670"
     }
   ],
+  "decisionChain": [
+    {
+      "name": "three-record-chain",
+      "comment": "records use only port-neutral keys, so the chain digests MUST be byte-identical across ports",
+      "records": [
+        { "id": "req-1", "at": "2026-07-11T00:00:01Z", "n": 1 },
+        { "id": "req-2", "at": "2026-07-11T00:00:02Z", "n": 2 },
+        { "id": "req-3", "at": "2026-07-11T00:00:03Z", "n": 3 }
+      ],
+      "expectedPrev": [null, "fnv1a64:eb4d4221315f55fa", "fnv1a64:3a4b4d623cbe28ba"],
+      "tampers": [
+        { "name": "head-value-breaks-next", "index": 0, "field": "n", "value": 999, "brokenAt": 1 },
+        { "name": "mid-id-breaks-next", "index": 1, "field": "id", "value": "req-EVIL", "brokenAt": 2 },
+        { "name": "head-prev-breaks-self", "index": 0, "field": "prev", "value": "fnv1a64:0000000000000000", "brokenAt": 0 }
+      ]
+    }
+  ],
   "gate": [
     {
       "name": "missing-no-records",

@@ -1,5 +1,9 @@
 # Completed — entry ใหม่บนสุด · เก็บ ≤30 entry เกินให้ย้ายไป archive/
 
+- **2026-07-11 · Tamper-evident decision chain** — `chainDecision`/`verifyDecisionChain`
+  (+ Python) · hash-chain decision log, `prev` additive (schema ยัง /1) · vectors
+  `decisionChain` ล็อก digest สองพอร์ต · `examples/tamper-evident-log.mjs` ·
+  design §7 → implemented · **fold เข้า 1.0.0 (PR #14)** ตาม constraint branch เดียว
 - **2026-07-11 · P0-2 CI badge + P3-3 prep** — README badges (test/npm/PyPI/license, #2) ·
   bump version → 1.0.0 ครบ 4 จุด · CHANGELOG `[1.0.0]` + breaking note (rules validation) ·
   release notes + case study skeleton (`docs/`) · **เหลือเจ้าของ: publish + tag + เติม case study**

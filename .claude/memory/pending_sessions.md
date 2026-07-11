@@ -17,7 +17,14 @@
 
 - **P3-4 Dashboard self-host** — เริ่มได้เมื่อ: ผู้ใช้จริง ≥10 **หรือ** มีคนขอ ≥3 (#8)
 
-## Follow-up เล็กที่จดไว้ (ทำเมื่อผ่านทางนั้น)
+## งานหลักเหลือ (Fable-profile: cross-port determinism)
+
+- **Fact cross-checking** (`verify_misquoted_value`, claim-verification §8) — record แนบ
+  `facts`, verifyClaims เช็คตัวเลขในประโยคที่ cite ตรงกับ fact จริง · **ต้อง design ปิด
+  กติกา normalize ที่ byte-identical ก่อน** (เลขไทย/ตัวคั่น/สกุลเงิน/rounding) · ตัว moat ที่ใหญ่สุดที่เหลือ
+- ~~tamper-evident chain~~ ✅ เสร็จ (fold เข้า 1.0.0)
+
+## Follow-up เล็กที่จดไว้ (โมเดลไหนก็ทำได้ — MCP JS-only ไม่มี parity)
 
 - MCP server ควรได้ tool `verify_claims` (spec §11 บอก "for free in a follow-up")
 - `evidenceGate` ยังไม่รับ `supporting` ผ่าน MCP `check_evidence` แบบมี tier ใน docs — เช็คตอนทำ verify_claims tool

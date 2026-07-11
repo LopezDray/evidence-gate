@@ -43,6 +43,45 @@ def evidence_digest(value):
     return "fnv1a64:" + fnv1a64(canonical_json(value))
 
 
+# ── Tamper-evident decision chain ────────────────────────────────────────────
+# Turn a decision log into a hash chain: each record carries "prev", the
+# evidence_digest() of the record written before it. Because a record's digest
+# covers its own "prev", editing any past JSONL line changes its digest and
+# breaks the "prev" of every record after it — cheap, zero-dependency
+# tamper-evidence (NOT cryptographic; same stance as the digest note above).
+# "prev" is an additive optional field: the record stays
+# evidence-gate.decision/1, and records outside a chain simply omit it.
+
+
+def chain_decision(decision, prev_digest=None):
+    """chain_decision(decision, prev_digest?) -> {**decision, "prev": prev_digest}.
+
+    Pass the previous chained record's evidence_digest() as prev_digest; the
+    first record in a chain takes None (the default). Pure — the caller
+    persists the returned record and threads its digest into the next call.
+    """
+    return {**decision, "prev": prev_digest}
+
+
+def verify_decision_chain(records):
+    """verify_decision_chain(records) -> {"valid", "broken_at"}.
+
+    Replays a chain of decision records (in the order they were written) and
+    reports the first record whose "prev" doesn't match the digest of the one
+    before it — broken_at is that index, or None when the whole chain holds.
+    The head must carry "prev": None. Never raises.
+    """
+    lst = records or []
+    for i in range(len(lst)):
+        rec = lst[i]
+        if not isinstance(rec, dict):
+            return {"valid": False, "broken_at": i}
+        expected_prev = None if i == 0 else evidence_digest(lst[i - 1])
+        if rec.get("prev") != expected_prev:
+            return {"valid": False, "broken_at": i}
+    return {"valid": True, "broken_at": None}
+
+
 def parse_date(value):
     if not value:
         return None

@@ -179,17 +179,30 @@ decision.provenance = {
 With `rules.provenance = { minAuthority: "official" }` the second example
 draws `provenance_untrusted`; without `rules.provenance` it draws nothing.
 
-## 7. Future: tamper-evident log (v1.x candidate, not in this scope)
+## 7. Tamper-evident log — **implemented (1.0.0)**
 
-The decision log becomes a hash chain with one pure helper:
+The decision log becomes a hash chain with two pure helpers:
 
 ```js
-chainDecision(decision, prevDigest) → { ...decision, prev: prevDigest }
+chainDecision(decision, prevDigest?) → { ...decision, prev: prevDigest ?? null }
+verifyDecisionChain(records)         → { valid, brokenAt }
 ```
 
-where `prevDigest = evidenceDigest(previousDecisionRecord)`. Any edit to a
-past JSONL line breaks every digest after it. Cheap, zero-dependency, and the
-reason `decision.at`/`decision.id` were caller-supplied from day one.
+- `prevDigest = evidenceDigest(previousChainedRecord)`; the first record in a
+  chain takes `null` (the default). Because a record's digest covers its own
+  `prev`, editing any past JSONL line changes its digest and breaks the `prev`
+  of **every** record after it — `verifyDecisionChain` reports the first broken
+  index. Cheap, zero-dependency, and the reason `decision.at`/`decision.id`
+  were caller-supplied from day one.
+- `prev` is an **additive optional field**: the record stays
+  `evidence-gate.decision/1` (§5 policy), and records outside a chain omit it.
+- Not cryptographic (same stance as the digest note): it detects after-the-fact
+  edits; it does not stop a forger who rewrites the entire tail. Snapshot the
+  latest digest somewhere append-only (or sign it) if you need that.
+
+See `examples/tamper-evident-log.mjs`. Python: `chain_decision` /
+`verify_decision_chain`, byte-identical (locked by `test/vectors.json`
+→ `decisionChain`).
 
 ## 8. Implementation plan (when picked up)
 
