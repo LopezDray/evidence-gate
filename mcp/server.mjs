@@ -18,7 +18,7 @@ import { evidenceGate } from "../src/core.js";
 import * as presets from "../src/presets.js";
 
 const server = new Server(
-  { name: "evidence-gate", version: "0.1.0" },
+  { name: "evidence-gate", version: "0.2.0" }, // keep in sync — .claude/skills/release-checklist.md
   { capabilities: { tools: {} } }
 );
 
