@@ -5,6 +5,12 @@
   ใหม่ misquoted_values), version 4 จุด = 1.0.0 ครบอยู่แล้ว, `docs/release-notes-v1.0.md` อัปให้
   ครอบ fact-check+MCP+anchor · release gate เขียว (2 พอร์ต + 4 examples + mcp.test) · **เหลือ
   เจ้าของล้วน**: tag/npm/PyPI/GitHub Release + เติมเลข case study
+- **2026-07-12 · v1.0.1 correction (MCP tool missed in v1.0.0 publish)** — เจ้าของ publish
+  npm/PyPI v1.0.0 จาก commit เก่ากว่า main (ก่อน PR #17 merge) → package จริงไม่มี MCP
+  `verify_claims` tool (ยืนยันด้วย `npm pack` จริง) แม้ tag/main อ้างว่ามี · แก้: CHANGELOG แยก
+  `[1.0.0]` (ของจริงที่ publish) ออกจาก `[1.0.1]` (MCP tool) · version 4 จุด bump → 1.0.1 ·
+  `docs/release-notes-v1.0.1.md` ใหม่ + แก้ `release-notes-v1.0.md` ให้ตรงของจริง · แนะนำเจ้าของ
+  แก้ GitHub Release v1.0.0 body ในแชท (ตัด verify_claims + ลบ draft-note) · release gate เขียว
 - **2026-07-12 · MCP `verify_claims` tool** — MCP server เปิด proof loop ครบสองครึ่ง
   (`check_evidence` + `verify_claims`) · tool รับ `{answer, records, supporting?, gate?, preset?,
   rules?, decision?}` → verdict ladder (รวม `misquoted_values` เมื่อ record มี `facts`) ·
