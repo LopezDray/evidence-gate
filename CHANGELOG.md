@@ -5,6 +5,17 @@ to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.0.1] — 2026-07-12
+
+### Added
+- **MCP `verify_claims` tool** — the MCP server exposes the post-generation
+  half of the loop alongside `check_evidence`: an agent calls it after drafting
+  an answer to get the verdict ladder (incl. `misquoted_values` when records
+  carry `facts`). Accepts `{ answer, records, supporting?, gate?, preset?,
+  rules?, decision? }`; with the same `decision.id` and records, its
+  verification record joins the `check_evidence` decision record on an
+  identical evidence digest.
+
 ## [1.0.0] — 2026-07-12
 
 First stable release. The proof loop is complete: the gate decides whether the
@@ -12,7 +23,7 @@ model may speak, `verifyClaims` checks that what it said stands on the evidence
 — citations resolve, claims are cited, and cited numbers match the records'
 `facts` — and provenance records where that evidence came from. All
 deterministic and byte-identical across the JS and Python ports, locked by a
-shared vector file, and callable over MCP.
+shared vector file, and callable over MCP (`check_evidence`).
 
 ### Changed
 - **BREAKING: rulesets are validated at call time.** `staleDays`, `minRecords`,
@@ -35,13 +46,6 @@ shared vector file, and callable over MCP.
   decimals, percents, and Thai numerals ๐-๙ all normalize deterministically
   and byte-identically across both ports; ISO dates are masked. Opt-in per
   record — without `facts` nothing changes.
-- **MCP `verify_claims` tool** — the MCP server exposes the post-generation
-  half of the loop alongside `check_evidence`: an agent calls it after drafting
-  an answer to get the verdict ladder (incl. `misquoted_values` when records
-  carry `facts`). Accepts `{ answer, records, supporting?, gate?, preset?,
-  rules?, decision? }`; with the same `decision.id` and records, its
-  verification record joins the `check_evidence` decision record on an
-  identical evidence digest.
 - **Tamper-evident decision log** — `chainDecision` / `chain_decision` links
   each decision record to the previous one by digest (`prev` field);
   `verifyDecisionChain` / `verify_decision_chain` replays a log and reports the
@@ -124,6 +128,7 @@ shared vector file, and callable over MCP.
   presets, and an MCP server exposing a `check_evidence` tool. JS and Python
   ports, zero runtime dependencies.
 
+[1.0.1]: https://github.com/LopezDray/evidence-gate/releases/tag/v1.0.1
 [1.0.0]: https://github.com/LopezDray/evidence-gate/releases/tag/v1.0.0
 [0.2.0]: https://github.com/LopezDray/evidence-gate/releases/tag/v0.2.0
 [0.1.0]: https://github.com/LopezDray/evidence-gate/releases/tag/v0.1.0

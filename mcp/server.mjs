@@ -23,7 +23,7 @@ import { verifyClaims } from "../src/verify.js";
 import * as presets from "../src/presets.js";
 
 const server = new Server(
-  { name: "evidence-gate", version: "1.0.0" }, // keep in sync — .claude/skills/release-checklist.md
+  { name: "evidence-gate", version: "1.0.1" }, // keep in sync — .claude/skills/release-checklist.md
   { capabilities: { tools: {} } }
 );
 

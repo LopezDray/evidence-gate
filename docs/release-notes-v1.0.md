@@ -1,8 +1,9 @@
 # Release notes — v1.0.0
 
-> Draft for the GitHub Release body. Owner: create the release from tag `v1.0.0`
-> (release-checklist.md step 11) after publishing npm + PyPI. Adjust the date in
-> CHANGELOG if you publish on a different day.
+> Published as GitHub Release v1.0.0 on 2026-07-12 (`f1a2985`). This matches
+> what actually shipped to npm/PyPI at that tag — it does NOT include the MCP
+> `verify_claims` tool, which was merged to `main` afterward and ships in
+> v1.0.1 instead. See `release-notes-v1.0.1.md`.
 
 ## Evidence Gate 1.0 — the proof loop is complete
 
@@ -30,9 +31,8 @@ This 1.0 closes the loop end-to-end:
   replay-verifiable digest.
 - **Audit trail** — decision and verification records join on the request id and
   an identical evidence digest, without storing the evidence or the answer.
-- **MCP server** — both halves of the loop ship as MCP tools (`check_evidence`
-  and `verify_claims`), so any MCP-compatible agent can gate and fact-check
-  itself around every answer.
+- **MCP server** — a `check_evidence` tool so any MCP-compatible agent can gate
+  itself before it speaks.
 
 Everything is byte-identical across the JavaScript and Python ports, locked by a
 shared vector file (`test/vectors.json`) that both test suites run.
@@ -57,3 +57,8 @@ pip install evidence-gate-py
 - The proof loop, provenance, MCP usage: [README](../README.md)
 - Design specs: [claim-verification](design/claim-verification.md) ·
   [provenance](design/provenance.md)
+
+> Note: the GitHub Release body as published omits the "Draft for..." note
+> above and the `verify_claims` mention in the MCP bullet — see the actual
+> published text at
+> https://github.com/LopezDray/evidence-gate/releases/tag/v1.0.0
