@@ -6,6 +6,13 @@ to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **MCP `verify_claims` tool** — the MCP server now exposes the post-generation
+  half of the loop alongside `check_evidence`: an agent calls it after drafting
+  an answer to get the verdict ladder (incl. `misquoted_values` when records
+  carry `facts`). Accepts `{ answer, records, supporting?, gate?, preset?,
+  rules?, decision? }`; with the same `decision.id` and records, its
+  verification record joins the `check_evidence` decision record on an
+  identical evidence digest.
 - **Fact cross-checking** — records may carry `facts: { name: number, … }`;
   `verifyClaims` / `verify_claims` then checks every number in a sentence
   citing that record against those values, exactly (design §8). A correctly
