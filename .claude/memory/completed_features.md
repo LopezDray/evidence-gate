@@ -5,12 +5,17 @@
   ใหม่ misquoted_values), version 4 จุด = 1.0.0 ครบอยู่แล้ว, `docs/release-notes-v1.0.md` อัปให้
   ครอบ fact-check+MCP+anchor · release gate เขียว (2 พอร์ต + 4 examples + mcp.test) · **เหลือ
   เจ้าของล้วน**: tag/npm/PyPI/GitHub Release + เติมเลข case study
-- **2026-07-12 · v1.0.1 correction (MCP tool missed in v1.0.0 publish)** — เจ้าของ publish
-  npm/PyPI v1.0.0 จาก commit เก่ากว่า main (ก่อน PR #17 merge) → package จริงไม่มี MCP
-  `verify_claims` tool (ยืนยันด้วย `npm pack` จริง) แม้ tag/main อ้างว่ามี · แก้: CHANGELOG แยก
-  `[1.0.0]` (ของจริงที่ publish) ออกจาก `[1.0.1]` (MCP tool) · version 4 จุด bump → 1.0.1 ·
-  `docs/release-notes-v1.0.1.md` ใหม่ + แก้ `release-notes-v1.0.md` ให้ตรงของจริง · แนะนำเจ้าของ
-  แก้ GitHub Release v1.0.0 body ในแชท (ตัด verify_claims + ลบ draft-note) · release gate เขียว
+- **2026-07-12 · v1.0.0 + v1.0.1 release — publish/version-mismatch resolved end-to-end**
+  · เจ้าของ publish npm/PyPI v1.0.0 จาก checkout ที่ยังไม่ pull main ล่าสุด → package จริงขาด
+  MCP `verify_claims` tool (fact cross-checking มีอยู่) ทั้งที่ CHANGELOG/GitHub Release พูดถึง
+  MCP tool ด้วย — ตรวจพบด้วย `npm pack evidence-gate@1.0.0` จริง (อย่าเชื่อ git log อย่างเดียว) ·
+  แก้ด้วย v1.0.1 patch: CHANGELOG แยก `[1.0.0]` (ของจริงที่ publish) ออกจาก `[1.0.1]` (MCP tool) ·
+  version 4 จุด bump → 1.0.1 (Python bump เพื่อ parity แม้ไม่มีโค้ดเปลี่ยน) · `release-notes-v1.0.1.md`
+  ใหม่ · GitHub Release ทั้งสองตัว (v1.0.0, v1.0.1) แก้ข้อความให้ตรงของจริงแล้ว verify ผ่าน API จริง
+  (ไม่มี `verify_claims` เท็จใน v1.0.0, ไม่มี draft-note/relative-link ใน v1.0.1) · **release เสร็จ
+  สมบูรณ์ทุกช่องทาง: npm 1.0.1, PyPI 1.0.1, tag v1.0.0+v1.0.1, GitHub Release ทั้งสองถูกต้อง** ·
+  บทเรียนบันทึกลง `release-checklist.md` แล้ว (pull ก่อน publish เสมอ, release notes ต้องไม่มี
+  meta-note ปน, `rm -rf dist/` ก่อน build, ใช้ URL เต็มใน release body)
 - **2026-07-12 · MCP `verify_claims` tool** — MCP server เปิด proof loop ครบสองครึ่ง
   (`check_evidence` + `verify_claims`) · tool รับ `{answer, records, supporting?, gate?, preset?,
   rules?, decision?}` → verdict ladder (รวม `misquoted_values` เมื่อ record มี `facts`) ·
