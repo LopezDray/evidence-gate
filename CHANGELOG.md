@@ -5,36 +5,14 @@ to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-### Added
-- **MCP `verify_claims` tool** — the MCP server now exposes the post-generation
-  half of the loop alongside `check_evidence`: an agent calls it after drafting
-  an answer to get the verdict ladder (incl. `misquoted_values` when records
-  carry `facts`). Accepts `{ answer, records, supporting?, gate?, preset?,
-  rules?, decision? }`; with the same `decision.id` and records, its
-  verification record joins the `check_evidence` decision record on an
-  identical evidence digest.
-- **Fact cross-checking** — records may carry `facts: { name: number, … }`;
-  `verifyClaims` / `verify_claims` then checks every number in a sentence
-  citing that record against those values, exactly (design §8). A correctly
-  cited but misquoted number now fails with new verdict `misquoted_values`
-  and block warning `verify_misquoted_value`; details in the new `misquotes`
-  result field and `stats.misquoted`. Magnitude suffixes (`K/M/B`, Thai
-  `พัน หมื่น แสน ล้าน` and compounds up to `ล้านล้าน`), thousands separators,
-  decimals, percents, and Thai numerals ๐-๙ all normalize deterministically
-  and byte-identically across both ports; ISO dates are masked. Opt-in per
-  record — without `facts` nothing changes.
-
-### Changed
-- Thai numerals ๐-๙ now count as claim digits in the default
-  `claimPatterns` — a sentence like "กำไร ๑๒ ล้าน" needs a citation. Override
-  `rules.verification.claimPatterns` to restore the old behavior.
-
-## [1.0.0] — 2026-07-11
+## [1.0.0] — 2026-07-12
 
 First stable release. The proof loop is complete: the gate decides whether the
-model may speak, `verifyClaims` checks that what it said stands on the evidence,
-and provenance records where that evidence came from — all deterministic and
-byte-identical across the JS and Python ports, locked by a shared vector file.
+model may speak, `verifyClaims` checks that what it said stands on the evidence
+— citations resolve, claims are cited, and cited numbers match the records'
+`facts` — and provenance records where that evidence came from. All
+deterministic and byte-identical across the JS and Python ports, locked by a
+shared vector file, and callable over MCP.
 
 ### Changed
 - **BREAKING: rulesets are validated at call time.** `staleDays`, `minRecords`,
@@ -42,8 +20,28 @@ byte-identical across the JS and Python ports, locked by a shared vector file.
   throws instead of silently behaving as permissive (the old JS behavior) or
   raising an opaque `KeyError` (the old Python behavior). If you pass a
   hand-built ruleset rather than a preset, ensure these three fields are set.
+- Thai numerals ๐-๙ count as claim digits in the default `claimPatterns` — a
+  sentence like "กำไร ๑๒ ล้าน" needs a citation. Override
+  `rules.verification.claimPatterns` to restore digit-free detection.
 
 ### Added
+- **Fact cross-checking** — records may carry `facts: { name: number, … }`;
+  `verifyClaims` / `verify_claims` then checks every number in a sentence
+  citing that record against those values, exactly (design §8). A correctly
+  cited but misquoted number fails with verdict `misquoted_values` and block
+  warning `verify_misquoted_value`; details in the `misquotes` result field
+  and `stats.misquoted`. Magnitude suffixes (`K/M/B`, Thai
+  `พัน หมื่น แสน ล้าน` and compounds up to `ล้านล้าน`), thousands separators,
+  decimals, percents, and Thai numerals ๐-๙ all normalize deterministically
+  and byte-identically across both ports; ISO dates are masked. Opt-in per
+  record — without `facts` nothing changes.
+- **MCP `verify_claims` tool** — the MCP server exposes the post-generation
+  half of the loop alongside `check_evidence`: an agent calls it after drafting
+  an answer to get the verdict ladder (incl. `misquoted_values` when records
+  carry `facts`). Accepts `{ answer, records, supporting?, gate?, preset?,
+  rules?, decision? }`; with the same `decision.id` and records, its
+  verification record joins the `check_evidence` decision record on an
+  identical evidence digest.
 - **Tamper-evident decision log** — `chainDecision` / `chain_decision` links
   each decision record to the previous one by digest (`prev` field);
   `verifyDecisionChain` / `verify_decision_chain` replays a log and reports the
@@ -70,7 +68,7 @@ byte-identical across the JS and Python ports, locked by a shared vector file.
   resolve to a real evidence record (no phantom evidence), every
   claim-looking sentence must carry a citation (no naked claims), and the
   framing must match the gate's verdict (no "as of today" over stale data).
-  Verdict ladder `phantom_citations` → `no_citations` →
+  Verdict ladder `phantom_citations` → `misquoted_values` → `no_citations` →
   `unsupported_claims` → `supported`; strict by default
   (`rules.verification.requireFullCoverage`). Deterministic, no model call,
   byte-identical across both ports (locked by shared vectors).
