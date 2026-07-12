@@ -238,7 +238,7 @@ for the full loop.
 
 ## Use it as an MCP server
 
-Give an agent a fact-checker it calls before it speaks. The package ships an MCP server exposing a `check_evidence` tool, so any MCP-compatible agent (Claude, IDE assistants, etc.) can gate itself.
+Give an agent both halves of the proof loop as tools it calls around every answer. The package ships an MCP server exposing `check_evidence` (before) and `verify_claims` (after), so any MCP-compatible agent (Claude, IDE assistants, etc.) can gate and fact-check itself.
 
 ```bash
 npm install evidence-gate @modelcontextprotocol/sdk   # the SDK is an optional peer
@@ -254,12 +254,10 @@ Register it with your client:
 }
 ```
 
-The tool accepts `{ records, supporting?, preset?, rules?, decision? }` and returns the gate result. Instruct your agent to call it first and refuse to answer when `allowedActions.summarize` is `false`.
+- **`check_evidence`** accepts `{ records, supporting?, preset?, rules?, decision? }` and returns the gate result. Instruct your agent to call it first and refuse to answer when `allowedActions.summarize` is `false`.
+- **`verify_claims`** accepts `{ answer, records, supporting?, gate?, preset?, rules?, decision? }` and returns the verification result — the same verdict ladder as the library (`supported` … `misquoted_values` … `phantom_citations`). The agent calls it after drafting an answer, passing the **same `records`** (and optionally the `check_evidence` result as `gate` for the freshness cross-check); if `pass` is `false` it fixes the answer from `caveats` and retries. Attach `facts` to records to catch misquoted numbers.
 
-Pass `decision: true` (or `decision: { id, at }`) to get the same audit-trail
-decision record as the library API, inside the tool result — so gate calls made
-through MCP are just as provable as direct ones. Persisting the record is the
-caller's job, same as the library.
+Pass `decision: true` (or `decision: { id, at }`) to either tool to get the same audit-trail record as the library API, inside the tool result — so calls made through MCP are just as provable as direct ones. Use the **same `id`** for a request's `check_evidence` and `verify_claims` calls and the two records join on it and on an identical evidence digest. Persisting the record is the caller's job, same as the library.
 
 ## Why trust it
 

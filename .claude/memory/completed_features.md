@@ -1,12 +1,18 @@
 # Completed — entry ใหม่บนสุด · เก็บ ≤30 entry เกินให้ย้ายไป archive/
 
+- **2026-07-12 · MCP `verify_claims` tool** — MCP server เปิด proof loop ครบสองครึ่ง
+  (`check_evidence` + `verify_claims`) · tool รับ `{answer, records, supporting?, gate?, preset?,
+  rules?, decision?}` → verdict ladder (รวม `misquoted_values` เมื่อ record มี `facts`) ·
+  digest join กับ decision record ของ check_evidence (id + evidence digest เดียวกัน) ·
+  JS-only (MCP ไม่มี Python port) · `test/mcp.test.mjs` ครอบ supported/misquote/phantom/
+  stale-framing/join · commit `3b13603` บน branch `claude/fable-fact-check-c7yt0b` (ยังไม่เปิด PR)
 - **2026-07-11 · Fact cross-checking (design §8) [Fable]** — records รับ `facts` →
   `verifyClaims`/`verify_claims` เช็คทุกตัวเลขในประโยคที่ cite แบบ strict+exact ·
   verdict ใหม่ `misquoted_values` + warning `verify_misquoted_value` (block) + `misquotes`
   + `stats.misquoted` · เลขไทย ๐-๙ เข้า default claimPatterns (vector เดิมอัปเดตแบบตั้งใจ) ·
   magnitude K/M/B + พัน…ล้านล้าน ผ่าน decimal-point-shift (ห้ามคูณ float — parity #9 ใหม่) ·
   vectors ใหม่ 12 เคส + unit tests สองพอร์ต · design §8 → full spec (เจ้าของเคาะ 4 trade-off) ·
-  branch `claude/fable-fact-check-c7yt0b` → **PR #16 เปิดแล้ว รอเจ้าของ review/merge**
+  **merged PR #16 (`f1a2985`)** · อยู่ใน CHANGELOG `[Unreleased]` — ยังไม่ bump version
 - **2026-07-11 · Tamper-evident decision chain** — `chainDecision`/`verifyDecisionChain`
   (+ Python) · hash-chain decision log, `prev` additive (schema ยัง /1) · vectors
   `decisionChain` ล็อก digest สองพอร์ต · `examples/tamper-evident-log.mjs` ·
