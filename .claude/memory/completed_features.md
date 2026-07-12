@@ -1,5 +1,10 @@
 # Completed — entry ใหม่บนสุด · เก็บ ≤30 entry เกินให้ย้ายไป archive/
 
+- **2026-07-12 · v1.0.0 release prep (fold)** — เจ้าของเลือก (a) fold fact cross-checking +
+  MCP verify_claims เข้า v1.0.0 · CHANGELOG `[Unreleased]` → `[1.0.0] — 2026-07-12` (รวม ladder
+  ใหม่ misquoted_values), version 4 จุด = 1.0.0 ครบอยู่แล้ว, `docs/release-notes-v1.0.md` อัปให้
+  ครอบ fact-check+MCP+anchor · release gate เขียว (2 พอร์ต + 4 examples + mcp.test) · **เหลือ
+  เจ้าของล้วน**: tag/npm/PyPI/GitHub Release + เติมเลข case study
 - **2026-07-12 · MCP `verify_claims` tool** — MCP server เปิด proof loop ครบสองครึ่ง
   (`check_evidence` + `verify_claims`) · tool รับ `{answer, records, supporting?, gate?, preset?,
   rules?, decision?}` → verdict ladder (รวม `misquoted_values` เมื่อ record มี `facts`) ·
