@@ -1,5 +1,13 @@
 # Completed — entry ใหม่บนสุด · เก็บ ≤30 entry เกินให้ย้ายไป archive/
 
+- **2026-07-12 · `examples/thai-rag.mjs` — Thai RAG full-loop example + 2 localization gotchas**
+  · เดโม gate→cite→generate→verify บนข้อมูลภาษาไทย (สมมติ ระบุชัด) 4 ซีน: ตอบถูก / แต่งเลขไทย
+  (๙๐๐๐๐๐ → misquoted block) / งบ stale + "ปัจจุบัน" (stale-framing review) / ไม่มีข้อมูล (gate
+  ปฏิเสธก่อนเรียก LLM) · **gotcha 1 (units)**: `ล้าน` เป็นตัวคูณ 10⁶ → ต้องเก็บ `facts` เป็นบาทเต็ม
+  (`850000e6`) ไม่งั้น false-positive misquote · **gotcha 2 (freshness)**: `freshnessPatterns`
+  default อังกฤษล้วน → คำไทย "ปัจจุบัน/ล่าสุด" หลุด ต้อง localize ผ่าน `rules.verification.
+  freshnessPatterns` · README จุด 4+5 เสริม note สองข้อนี้ + อ้าง example (sync python/README แล้ว)
+  · JS-only (เหมือน MCP ไม่มี parity Python) · verify: npm test 317/317 ผ่าน + example รันได้
 - **2026-07-12 · v1.0.0 release prep (fold)** — เจ้าของเลือก (a) fold fact cross-checking +
   MCP verify_claims เข้า v1.0.0 · CHANGELOG `[Unreleased]` → `[1.0.0] — 2026-07-12` (รวม ladder
   ใหม่ misquoted_values), version 4 จุด = 1.0.0 ครบอยู่แล้ว, `docs/release-notes-v1.0.md` อัปให้

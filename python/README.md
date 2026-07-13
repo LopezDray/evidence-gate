@@ -201,13 +201,18 @@ The core can't judge semantic truth, so it verifies a **citation protocol**:
    `rules.verification.claimPatterns`) must carry a valid citation —
    **no naked claims**.
 4. The framing must match the gate's verdict — **no "as of today" over
-   stale data** (pass the gate result in).
+   stale data** (pass the gate result in). Fresh-sounding phrases are matched
+   with an **English-only** default list; localize via
+   `rules.verification.freshnessPatterns` (e.g. add Thai `ปัจจุบัน|ล่าสุด`) or
+   the check silently passes non-English framing.
 5. If a record carries `facts`, every number in a sentence citing it must
    match those facts **exactly** — **no misquoted values**. `1.5M`,
    `1,234,500`, `๑.๕ ล้าน`, `8%` all normalize deterministically (magnitude
    suffixes `K/M/B` and Thai `พัน`…`ล้านล้าน`; ISO dates are ignored), and a
    correctly cited but wrong number blocks with `verdict:
-   "misquoted_values"`. Opt-in per record; no facts, no change.
+   "misquoted_values"`. Opt-in per record; no facts, no change. Because `ล้าน`
+   multiplies, store `facts` in **whole units** (e.g. baht) and let the model
+   say "850000 ล้านบาท" — storing `850000` mismatches `850000 × 10⁶`.
 
 ```js
 import { evidenceGate, verifyClaims, citationBlock, presets } from "evidence-gate";
@@ -234,7 +239,9 @@ With `decision` opted in, the verification record
 request id **and** on an identical evidence digest — so for every answer your
 log can prove which evidence was allowed and what the model did with it,
 without storing the evidence or the answer. See `examples/verified-loop.mjs`
-for the full loop.
+for the full loop, or `examples/thai-rag.mjs` for the same loop over
+Thai-language data (Thai numerals, `ล้าน`/`พันล้าน` magnitudes, and localized
+freshness patterns).
 
 ## Use it as an MCP server
 

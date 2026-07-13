@@ -7,6 +7,8 @@
    เนื้อหาตรงกับของจริง 100% — ดูรายละเอียดเหตุการณ์ v1.0.0/v1.0.1 mismatch ใน completed_features.md
    · **ยังค้าง**: `docs/case-study-daddyinvestor.md` = skeleton ต้องเจ้าของเติมเลขจริง (ห้าม
    Claude แต่ง) แล้วลิงก์จาก README
+   · หมายเหตุ: ช่อง "วิธีใช้/บทเรียน" อ้าง `examples/thai-rag.mjs` ได้ (units + freshness
+   localization pattern พิสูจน์แล้ว) — เหลือแค่ตัวเลข before/after ที่ติดเจ้าของ
 
 ## ติดเจ้าของล้วน (Claude ไม่ต้องแตะ)
 
@@ -23,6 +25,6 @@
   (ออกพร้อม fact-checking — version bump ก้อนเดียวกัน)
 - (ยังไม่มี follow-up เล็กค้าง)
 
-_อัปเดตล่าสุด: 2026-07-12 (ปิด session · v1.0.0 + v1.0.1 release เสร็จสมบูรณ์ทุกช่องทาง — npm/PyPI/
-tag/GitHub Release ทั้งสองตัวถูกต้อง verify ผ่าน API จริงแล้ว · บทเรียน publish-mismatch บันทึกลง
-release-checklist.md แล้ว · งานถัดไป = case study เท่านั้น (ติดเจ้าของ) ไม่มีงานโค้ดค้าง)_
+_อัปเดตล่าสุด: 2026-07-13 (เพิ่ม `examples/thai-rag.mjs` — Thai RAG full-loop + doc 2 gotchas
+(units/freshness localization) ใน README (sync python แล้ว) · npm test 317/317 ผ่าน · JS-only ไม่มี
+parity Python · งานถัดไปยังเหมือนเดิม = case study เติมเลขจริง (ติดเจ้าของ) ไม่มีงานโค้ดค้าง)_
